@@ -1,0 +1,7 @@
+interface kimap-explorer {
+}
+
+world kimap-explorer-mothu-et-doria-dot-os-v0 {
+    import kimap-explorer;
+    include process-v0;
+}

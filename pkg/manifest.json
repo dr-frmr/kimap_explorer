@@ -1,0 +1,18 @@
+[
+    {
+        "process_name": "kimap_explorer",
+        "process_wasm_path": "/kimap_explorer.wasm",
+        "on_exit": "Restart",
+        "request_networking": false,
+        "request_capabilities": [
+            "http_server:distro:sys",
+            "eth:distro:sys"
+        ],
+        "grant_capabilities": [
+            "http_server:distro:sys",
+            "eth:distro:sys",
+            "terminal:terminal:sys"
+        ],
+        "public": false
+    }
+]
