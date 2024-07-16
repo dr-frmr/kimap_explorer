@@ -6,7 +6,8 @@
         "request_networking": false,
         "request_capabilities": [
             "http_server:distro:sys",
-            "eth:distro:sys"
+            "eth:distro:sys",
+            "vfs:distro:sys"
         ],
         "grant_capabilities": [
             "http_server:distro:sys",

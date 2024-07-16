@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KIMAP Explorer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdf6e3;
+            color: #657b83;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #586e75;
+        }
+
+        .node {
+            margin-left: 20px;
+        }
+
+        .node-name {
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .node-info {
+            color: #93a1a1;
+            font-size: 0.9em;
+        }
+
+        .arrow {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            margin-right: 5px;
+            border-top: 5px solid #657b83;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            transition: transform 0.3s;
+        }
+
+        .arrow.expanded {
+            transform: rotate(-90deg);
+        }
+
+        .children {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>KIMAP Explorer</h1>
+    <div id="tree-container"></div>
+
+    <script>
+        async function fetchNode(hash) {
+            const response = await fetch(`/kimap_explorer:kimap_explorer:mothu-et-doria.os/api/node/${hash}`);
+            return await response.json();
+        }
+
+        function createNodeElement(node, hash) {
+            const nodeElement = document.createElement('div');
+            nodeElement.className = 'node';
+
+            const nameElement = document.createElement('span');
+            nameElement.className = 'node-name';
+
+            if (node.children.length > 0 || node.data_keys.length > 0) {
+                const arrow = document.createElement('span');
+                arrow.className = 'arrow';
+                nameElement.appendChild(arrow);
+            }
+
+            nameElement.appendChild(document.createTextNode(node.name || 'Root'));
+            nodeElement.appendChild(nameElement);
+
+            const infoElement = document.createElement('span');
+            infoElement.className = 'node-info';
+            infoElement.textContent = ` (${node.data_keys.length} data keys, ${node.children.length} children)`;
+            nodeElement.appendChild(infoElement);
+
+            const contentContainer = document.createElement('div');
+            contentContainer.className = 'content';
+            contentContainer.style.display = 'none';
+            nodeElement.appendChild(contentContainer);
+
+            if (node.data_keys.length > 0) {
+                const dataKeysContainer = document.createElement('div');
+                dataKeysContainer.className = 'data-keys';
+                for (const key of node.data_keys) {
+                    const dataKeyElement = document.createElement('div');
+                    dataKeyElement.className = 'data-key';
+                    dataKeyElement.textContent = key;
+                    dataKeysContainer.appendChild(dataKeyElement);
+                }
+                contentContainer.appendChild(dataKeysContainer);
+            }
+
+            if (node.children.length > 0 || node.data_keys.length > 0) {
+                nameElement.addEventListener('click', async () => {
+                    const arrow = nameElement.querySelector('.arrow');
+                    arrow.classList.toggle('expanded');
+
+                    if (contentContainer.children.length === 0 && node.children.length > 0) {
+                        for (const childHash of node.children) {
+                            const childNode = await fetchNode(childHash);
+                            contentContainer.appendChild(createNodeElement(childNode, childHash));
+                        }
+                    }
+
+                    contentContainer.style.display = contentContainer.style.display === 'none' ? 'block' : 'none';
+                });
+            }
+
+            return nodeElement;
+        }
+
+        async function renderTree() {
+            const rootNode = await fetchNode('0x0000000000000000000000000000000000000000000000000000000000000000');
+            const treeContainer = document.getElementById('tree-container');
+            treeContainer.innerHTML = '';
+
+            for (const childHash of rootNode.children) {
+                const childNode = await fetchNode(childHash);
+                const childElement = createNodeElement(childNode, childHash);
+                treeContainer.appendChild(childElement);
+            }
+        }
+
+        renderTree();
+    </script>
+</body>
+
+</html>
