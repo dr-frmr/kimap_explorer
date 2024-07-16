@@ -18,6 +18,11 @@
             color: #586e75;
         }
 
+        .explanation {
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
         .node {
             margin-left: 20px;
         }
@@ -55,6 +60,9 @@
 
 <body>
     <h1>KIMAP Explorer</h1>
+    <div class="explanation">
+        (data-keys, children)
+    </div>
     <div id="tree-container"></div>
 
     <script>
@@ -81,7 +89,7 @@
 
             const infoElement = document.createElement('span');
             infoElement.className = 'node-info';
-            infoElement.textContent = ` (${node.data_keys.length} data keys, ${node.children.length} children)`;
+            infoElement.textContent = ` (${node.data_keys.length}, ${node.children.length})`;
             nodeElement.appendChild(infoElement);
 
             const contentContainer = document.createElement('div');
