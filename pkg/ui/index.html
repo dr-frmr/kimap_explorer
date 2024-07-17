@@ -6,54 +6,114 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KIMAP Explorer</title>
     <style>
+        /* General styles */
         body {
             font-family: Arial, sans-serif;
             background-color: #fdf6e3;
             color: #657b83;
             margin: 0;
             padding: 20px;
+            line-height: 1.6;
         }
 
         h1 {
             color: #586e75;
+            margin-bottom: 15px;
         }
 
         .explanation {
             margin-bottom: 20px;
             font-style: italic;
+            color: #93a1a1;
         }
 
+        /* Node styles */
         .node {
             margin-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        .node-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
         }
 
         .node-name {
             font-weight: bold;
             cursor: pointer;
+            display: flex;
+            align-items: center;
         }
 
         .node-info {
             color: #93a1a1;
             font-size: 0.9em;
+            margin-left: 5px;
         }
 
+        /* Arrow styles */
         .arrow {
             display: inline-block;
             width: 0;
             height: 0;
-            margin-right: 5px;
-            border-top: 5px solid #657b83;
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            transition: transform 0.3s;
+            margin-right: 8px;
+            border-left: 6px solid #657b83;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            transition: transform 0.3s ease;
         }
 
         .arrow.expanded {
-            transform: rotate(-90deg);
+            transform: rotate(90deg);
         }
 
-        .children {
-            display: none;
+        /* Button styles */
+        .info-button {
+            margin-left: 5px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 16px;
+            padding: 2px 5px;
+            border-radius: 3px;
+            transition: background-color 0.2s ease;
+        }
+
+        .info-button:hover {
+            background-color: #eee8d5;
+        }
+
+        /* Container styles */
+        .info-container,
+        .data-key .info-container {
+            margin-left: 20px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            padding: 10px;
+            background-color: #eee8d5;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        /* Data key styles */
+        .data-keys {
+            margin-top: 5px;
+        }
+
+        .data-key {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .data-key .info-button {
+            margin-left: 5px;
+        }
+
+        /* Content styles */
+        .content {
+            margin-left: 20px;
         }
     </style>
 </head>
@@ -71,57 +131,112 @@
             return await response.json();
         }
 
+        async function fetchNodeInfo(hash) {
+            const response = await fetch(`/kimap_explorer:kimap_explorer:mothu-et-doria.os/api/info/${hash}`);
+            return await response.json();
+        }
+
         function createNodeElement(node, hash) {
             const nodeElement = document.createElement('div');
             nodeElement.className = 'node';
 
+            const headerElement = document.createElement('div');
+            headerElement.className = 'node-header';
+            nodeElement.appendChild(headerElement);
+
             const nameElement = document.createElement('span');
             nameElement.className = 'node-name';
 
-            if (node.children.length > 0 || node.data_keys.length > 0) {
+            const childHashes = Array.from(node.child_hashes || []);
+            const dataKeys = Object.keys(node.data_keys || {});
+
+            if (childHashes.length > 0 || dataKeys.length > 0) {
                 const arrow = document.createElement('span');
                 arrow.className = 'arrow';
                 nameElement.appendChild(arrow);
             }
 
             nameElement.appendChild(document.createTextNode(node.name || 'Root'));
-            nodeElement.appendChild(nameElement);
+            headerElement.appendChild(nameElement);
 
             const infoElement = document.createElement('span');
             infoElement.className = 'node-info';
-            infoElement.textContent = ` (${node.data_keys.length}, ${node.children.length})`;
-            nodeElement.appendChild(infoElement);
+            infoElement.textContent = ` (${dataKeys.length}, ${childHashes.length})`;
+            headerElement.appendChild(infoElement);
+
+            const infoButton = document.createElement('button');
+            infoButton.textContent = 'ℹ️';
+            infoButton.className = 'info-button';
+            headerElement.appendChild(infoButton);
+
+            const infoContainer = document.createElement('div');
+            infoContainer.className = 'info-container';
+            infoContainer.style.display = 'none';
+            nodeElement.appendChild(infoContainer);
 
             const contentContainer = document.createElement('div');
             contentContainer.className = 'content';
             contentContainer.style.display = 'none';
             nodeElement.appendChild(contentContainer);
 
-            if (node.data_keys.length > 0) {
+            // Display data keys
+            if (dataKeys.length > 0) {
                 const dataKeysContainer = document.createElement('div');
                 dataKeysContainer.className = 'data-keys';
-                for (const key of node.data_keys) {
+                for (const key of dataKeys) {
                     const dataKeyElement = document.createElement('div');
                     dataKeyElement.className = 'data-key';
                     dataKeyElement.textContent = key;
+
+                    const dataValueButton = document.createElement('button');
+                    dataValueButton.textContent = '📄';
+                    dataValueButton.className = 'info-button';
+                    dataKeyElement.appendChild(dataValueButton);
+
+                    const dataValueContainer = document.createElement('div');
+                    dataValueContainer.className = 'info-container';
+                    dataValueContainer.style.display = 'none';
+                    dataValueContainer.textContent = node.data_keys[key];
+                    dataKeyElement.appendChild(dataValueContainer);
+
+                    dataValueButton.addEventListener('click', () => {
+                        dataValueContainer.style.display = dataValueContainer.style.display === 'none' ? 'block' : 'none';
+                    });
+
                     dataKeysContainer.appendChild(dataKeyElement);
                 }
                 contentContainer.appendChild(dataKeysContainer);
             }
 
-            if (node.children.length > 0 || node.data_keys.length > 0) {
+            infoButton.addEventListener('click', async () => {
+                if (infoContainer.children.length === 0) {
+                    const info = await fetchNodeInfo(hash);
+                    infoContainer.innerHTML = `
+            <div>Owner: ${info.owner}</div>
+            <div>TBA: ${info.tba}</div>
+            <div>Data Hex: ${info.data_hex}</div>
+            `;
+                }
+                infoContainer.style.display = infoContainer.style.display === 'none' ? 'block' : 'none';
+            });
+
+            if (childHashes.length > 0 || dataKeys.length > 0) {
                 nameElement.addEventListener('click', async () => {
                     const arrow = nameElement.querySelector('.arrow');
                     arrow.classList.toggle('expanded');
 
-                    if (contentContainer.children.length === 0 && node.children.length > 0) {
-                        for (const childHash of node.children) {
-                            const childNode = await fetchNode(childHash);
-                            contentContainer.appendChild(createNodeElement(childNode, childHash));
-                        }
+                    if (contentContainer.children.length === childHashes.length + (dataKeys.length > 0 ? 1 : 0)) {
+                        contentContainer.style.display = contentContainer.style.display === 'none' ? 'block' : 'none';
+                        return;
                     }
 
-                    contentContainer.style.display = contentContainer.style.display === 'none' ? 'block' : 'none';
+                    // Fetch and display child nodes
+                    for (const childHash of childHashes) {
+                        const childNode = await fetchNode(childHash);
+                        contentContainer.appendChild(createNodeElement(childNode, childHash));
+                    }
+
+                    contentContainer.style.display = 'block';
                 });
             }
 
@@ -133,7 +248,8 @@
             const treeContainer = document.getElementById('tree-container');
             treeContainer.innerHTML = '';
 
-            for (const childHash of rootNode.children) {
+            const childHashes = Array.from(rootNode.child_hashes || []);
+            for (const childHash of childHashes) {
                 const childNode = await fetchNode(childHash);
                 const childElement = createNodeElement(childNode, childHash);
                 treeContainer.appendChild(childElement);
@@ -142,6 +258,7 @@
 
         renderTree();
     </script>
+
 </body>
 
 </html>

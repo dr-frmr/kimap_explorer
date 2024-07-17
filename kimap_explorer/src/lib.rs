@@ -16,6 +16,7 @@ enum ExplorerRequest {
     SubTree(String),
 }
 
+#[derive(Deserialize, Serialize)]
 struct NamespaceEntry {
     pub parent_path: String,
     pub name: String,
@@ -149,12 +150,7 @@ impl State {
             .index
             .get(hash)
             .ok_or(anyhow::anyhow!("Node not found"))?;
-        Ok(serde_json::json!({
-            "name": node.name,
-            "parent_path": node.parent_path,
-            "data_keys": node.data_keys.keys().collect::<Vec<_>>(),
-            "children": node.child_hashes.iter().collect::<Vec<_>>(),
-        }))
+        Ok(serde_json::to_value(node)?)
     }
 }
 
@@ -198,6 +194,7 @@ fn init(our: Address) {
 
     http::bind_http_path("/api/tree", false, false).unwrap();
     http::bind_http_path("/api/node/:hash", false, false).unwrap();
+    http::bind_http_path("/api/info/:hash", false, false).unwrap();
 
     loop {
         match await_message() {
@@ -250,8 +247,30 @@ fn handle_message(
                     Some(headers),
                     node.to_string().as_bytes().to_vec(),
                 );
+            } else if req.path()?.starts_with("/api/info/") {
+                let hash = req.url_params().get("hash").unwrap();
+                let ret = state.kimap.get_hash(&hash);
+
+                if let Ok((tba, owner, data)) = ret {
+                    let info = serde_json::json!({
+                        "tba": tba,
+                        "owner": owner,
+                        "data": data,
+                    });
+
+                    let headers =
+                        HashMap::from([("Content-Type".into(), "application/json".into())]);
+
+                    http::send_response(
+                        http::StatusCode::OK,
+                        Some(headers),
+                        info.to_string().as_bytes().to_vec(),
+                    );
+                } else {
+                    http::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
+                }
             } else {
-                http::send_response(http::StatusCode::NOT_FOUND, None, vec![])
+                http::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
             }
         }
         Ok(())
