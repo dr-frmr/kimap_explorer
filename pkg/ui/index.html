@@ -18,6 +18,7 @@
 
         h1 {
             color: #586e75;
+            margin-top: 0;
             margin-bottom: 15px;
         }
 
@@ -111,6 +112,13 @@
             margin-left: 5px;
         }
 
+        #web3modal-button-container {
+            position: fixed;
+            top: 1em;
+            right: 0.2em;
+            z-index: 1000;
+        }
+
         /* Content styles */
         .content {
             margin-left: 20px;
@@ -119,6 +127,9 @@
 </head>
 
 <body>
+    <div id="web3modal-button-container">
+        <w3m-button></w3m-button>
+    </div>
     <h1>KIMAP Explorer</h1>
     <div class="explanation">
         (data-keys, children)
@@ -259,6 +270,33 @@
         renderTree();
     </script>
 
+    <script type="module">
+        import { createWeb3Modal, defaultWagmiConfig } from 'https://esm.sh/@web3modal/wagmi@5.0.6?bundle'
+        import { optimism } from 'https://esm.sh/viem/chains'
+        import { connect } from 'https://esm.sh/@wagmi/core@2.x'
+
+        const projectId = 'YOUR_PROJECT_ID'
+
+        const metadata = {
+            name: 'KIMAP Explorer',
+            description: 'KIMAP Explorer',
+            url: '',
+            icons: ['https://i.imgur.com/FFgKZ1O.png']
+        }
+
+        const chains = [optimism]
+        const config = defaultWagmiConfig({
+            chains,
+            projectId,
+            metadata,
+        })
+        connect(config)
+
+        const modal = createWeb3Modal({
+            wagmiConfig: config,
+            projectId,
+        })
+    </script>
 </body>
 
 </html>
