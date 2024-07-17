@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KIMAP Explorer</title>
+    <style>
+        /* General styles */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fdf6e3;
+            color: #657b83;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            color: #586e75;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .explanation {
+            margin-bottom: 20px;
+            font-style: italic;
+            color: #93a1a1;
+        }
+
+        /* Node styles */
+        .node {
+            margin-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        .node-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .node-name {
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .node-info {
+            color: #93a1a1;
+            font-size: 0.9em;
+            margin-left: 5px;
+        }
+
+        /* Arrow styles */
+        .arrow {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            margin-right: 8px;
+            border-left: 6px solid #657b83;
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            transition: transform 0.3s ease;
+        }
+
+        .arrow.expanded {
+            transform: rotate(90deg);
+        }
+
+        /* Button styles */
+        .info-button {
+            margin-left: 5px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 16px;
+            padding: 2px 5px;
+            border-radius: 3px;
+            transition: background-color 0.2s ease;
+        }
+
+        .info-button:hover {
+            background-color: #eee8d5;
+        }
+
+        /* Container styles */
+        .info-container,
+        .data-key .info-container {
+            margin-left: 20px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            padding: 10px;
+            background-color: #eee8d5;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        /* Data key styles */
+        .data-keys {
+            margin-top: 5px;
+        }
+
+        .data-key {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .data-key .info-button {
+            margin-left: 5px;
+        }
+
+        #web3modal-button-container {
+            position: fixed;
+            top: 1em;
+            right: 0.2em;
+            z-index: 1000;
+        }
+
+        /* Content styles */
+        .content {
+            margin-left: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="web3modal-button-container">
+        <w3m-button></w3m-button>
+    </div>
+    <h1>KIMAP Explorer</h1>
+    <div class="explanation">
+        (data-keys, children)
+    </div>
+    <div id="tree-container"></div>
+
+    <script>
+        async function fetchNode(hash) {
+            const response = await fetch(`/kimap_explorer:kimap_explorer:mothu-et-doria.os/api/node/${hash}`);
+            return await response.json();
+        }
+
+        async function fetchNodeInfo(hash) {
+            const response = await fetch(`/kimap_explorer:kimap_explorer:mothu-et-doria.os/api/info/${hash}`);
+            return await response.json();
+        }
+
+        function createNodeElement(node, hash) {
+            const nodeElement = document.createElement('div');
+            nodeElement.className = 'node';
+
+            const headerElement = document.createElement('div');
+            headerElement.className = 'node-header';
+            nodeElement.appendChild(headerElement);
+
+            const nameElement = document.createElement('span');
+            nameElement.className = 'node-name';
+
+            const childHashes = Array.from(node.child_hashes || []);
+            const dataKeys = Object.keys(node.data_keys || {});
+
+            if (childHashes.length > 0 || dataKeys.length > 0) {
+                const arrow = document.createElement('span');
+                arrow.className = 'arrow';
+                nameElement.appendChild(arrow);
+            }
+
+            nameElement.appendChild(document.createTextNode(node.name || 'Root'));
+            headerElement.appendChild(nameElement);
+
+            const infoElement = document.createElement('span');
+            infoElement.className = 'node-info';
+            infoElement.textContent = ` (${dataKeys.length}, ${childHashes.length})`;
+            headerElement.appendChild(infoElement);
+
+            const infoButton = document.createElement('button');
+            infoButton.textContent = 'ℹ️';
+            infoButton.className = 'info-button';
+            headerElement.appendChild(infoButton);
+
+            const infoContainer = document.createElement('div');
+            infoContainer.className = 'info-container';
+            infoContainer.style.display = 'none';
+            nodeElement.appendChild(infoContainer);
+
+            const contentContainer = document.createElement('div');
+            contentContainer.className = 'content';
+            contentContainer.style.display = 'none';
+            nodeElement.appendChild(contentContainer);
+
+            // Display data keys
+            if (dataKeys.length > 0) {
+                const dataKeysContainer = document.createElement('div');
+                dataKeysContainer.className = 'data-keys';
+                for (const key of dataKeys) {
+                    const dataKeyElement = document.createElement('div');
+                    dataKeyElement.className = 'data-key';
+                    dataKeyElement.textContent = key;
+
+                    const dataValueButton = document.createElement('button');
+                    dataValueButton.textContent = '📄';
+                    dataValueButton.className = 'info-button';
+                    dataKeyElement.appendChild(dataValueButton);
+
+                    const dataValueContainer = document.createElement('div');
+                    dataValueContainer.className = 'info-container';
+                    dataValueContainer.style.display = 'none';
+                    dataValueContainer.textContent = node.data_keys[key];
+                    dataKeyElement.appendChild(dataValueContainer);
+
+                    dataValueButton.addEventListener('click', () => {
+                        dataValueContainer.style.display = dataValueContainer.style.display === 'none' ? 'block' : 'none';
+                    });
+
+                    dataKeysContainer.appendChild(dataKeyElement);
+                }
+                contentContainer.appendChild(dataKeysContainer);
+            }
+
+            infoButton.addEventListener('click', async () => {
+                if (infoContainer.children.length === 0) {
+                    const info = await fetchNodeInfo(hash);
+                    infoContainer.innerHTML = `
+            <div>Owner: ${info.owner}</div>
+            <div>TBA: ${info.tba}</div>
+            <div>Data Hex: ${info.data_hex}</div>
+            `;
+                }
+                infoContainer.style.display = infoContainer.style.display === 'none' ? 'block' : 'none';
+            });
+
+            if (childHashes.length > 0 || dataKeys.length > 0) {
+                nameElement.addEventListener('click', async () => {
+                    const arrow = nameElement.querySelector('.arrow');
+                    arrow.classList.toggle('expanded');
+
+                    if (contentContainer.children.length === childHashes.length + (dataKeys.length > 0 ? 1 : 0)) {
+                        contentContainer.style.display = contentContainer.style.display === 'none' ? 'block' : 'none';
+                        return;
+                    }
+
+                    // Fetch and display child nodes
+                    for (const childHash of childHashes) {
+                        const childNode = await fetchNode(childHash);
+                        contentContainer.appendChild(createNodeElement(childNode, childHash));
+                    }
+
+                    contentContainer.style.display = 'block';
+                });
+            }
+
+            return nodeElement;
+        }
+
+        async function renderTree() {
+            const rootNode = await fetchNode('0x0000000000000000000000000000000000000000000000000000000000000000');
+            const treeContainer = document.getElementById('tree-container');
+            treeContainer.innerHTML = '';
+
+            const childHashes = Array.from(rootNode.child_hashes || []);
+            for (const childHash of childHashes) {
+                const childNode = await fetchNode(childHash);
+                const childElement = createNodeElement(childNode, childHash);
+                treeContainer.appendChild(childElement);
+            }
+        }
+
+        renderTree();
+    </script>
+
+    <script type="module">
+        import { createWeb3Modal, defaultWagmiConfig } from 'https://esm.sh/@web3modal/wagmi@5.0.6?bundle'
+        import { optimism } from 'https://esm.sh/viem/chains'
+        import { connect } from 'https://esm.sh/@wagmi/core@2.x'
+
+        const projectId = 'YOUR_PROJECT_ID'
+
+        const metadata = {
+            name: 'KIMAP Explorer',
+            description: 'KIMAP Explorer',
+            url: '',
+            icons: ['https://i.imgur.com/FFgKZ1O.png']
+        }
+
+        const chains = [optimism]
+        const config = defaultWagmiConfig({
+            chains,
+            projectId,
+            metadata,
+        })
+        connect(config)
+
+        const modal = createWeb3Modal({
+            wagmiConfig: config,
+            projectId,
+        })
+    </script>
+</body>
+
+</html>

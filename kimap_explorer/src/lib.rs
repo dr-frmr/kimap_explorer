@@ -1,7 +1,7 @@
 use alloy_sol_types::SolEvent;
-use kinode_process_lib::{await_message, call_init, eth, kimap, println, Address, Message};
+use kinode_process_lib::{await_message, call_init, eth, http, kimap, println, Address, Message};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 wit_bindgen::generate!({
     path: "target/wit",
@@ -16,6 +16,7 @@ enum ExplorerRequest {
     SubTree(String),
 }
 
+#[derive(Deserialize, Serialize)]
 struct NamespaceEntry {
     pub parent_path: String,
     pub name: String,
@@ -142,6 +143,15 @@ impl State {
             }
         ))
     }
+
+    // for frontend, todo improve
+    pub fn get_node_json(&self, hash: &str) -> anyhow::Result<serde_json::Value> {
+        let node = self
+            .index
+            .get(hash)
+            .ok_or(anyhow::anyhow!("Node not found"))?;
+        Ok(serde_json::to_value(node)?)
+    }
 }
 
 call_init!(init);
@@ -180,6 +190,12 @@ fn init(our: Address) {
         }
     }
 
+    http::serve_ui(&our, "ui", false, false, vec!["/"]).unwrap();
+
+    http::bind_http_path("/api/tree", false, false).unwrap();
+    http::bind_http_path("/api/node/:hash", false, false).unwrap();
+    http::bind_http_path("/api/info/:hash", false, false).unwrap();
+
     loop {
         match await_message() {
             Err(e) => {
@@ -206,29 +222,74 @@ fn handle_message(
 
     if source.process == "eth:distro:sys" {
         match handle_eth_message(&our, state, &body) {
-            Ok(_) => return Ok(()),
+            Ok(_) => Ok(()),
             Err(e) => {
                 state.kimap.provider.subscribe_loop(1, filter.clone());
-                return Err(e);
+                Err(e)
             }
         }
+    } else if source.process == "http_server:distro:sys" {
+        if let Ok(http::HttpServerRequest::Http(req)) = serde_json::from_slice(&body) {
+            if req.path()? == "/api/tree" {
+                let tree = state.get_node_json(&kimap::KIMAP_ROOT_HASH)?;
+                let headers = HashMap::from([("Content-Type".into(), "application/json".into())]);
+                http::send_response(
+                    http::StatusCode::OK,
+                    Some(headers),
+                    tree.to_string().as_bytes().to_vec(),
+                );
+            } else if req.path()?.starts_with("/api/node/") {
+                let hash = req.url_params().get("hash").unwrap();
+                let node = state.get_node_json(&hash)?;
+                let headers = HashMap::from([("Content-Type".into(), "application/json".into())]);
+                http::send_response(
+                    http::StatusCode::OK,
+                    Some(headers),
+                    node.to_string().as_bytes().to_vec(),
+                );
+            } else if req.path()?.starts_with("/api/info/") {
+                let hash = req.url_params().get("hash").unwrap();
+                let ret = state.kimap.get_hash(&hash);
+
+                if let Ok((tba, owner, data)) = ret {
+                    let info = serde_json::json!({
+                        "tba": tba,
+                        "owner": owner,
+                        "data": data,
+                    });
+
+                    let headers =
+                        HashMap::from([("Content-Type".into(), "application/json".into())]);
+
+                    http::send_response(
+                        http::StatusCode::OK,
+                        Some(headers),
+                        info.to_string().as_bytes().to_vec(),
+                    );
+                } else {
+                    http::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
+                }
+            } else {
+                http::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
+            }
+        }
+        Ok(())
     } else {
         match serde_json::from_slice(&body) {
             Ok(ExplorerRequest::Tree) => {
                 println!("tree:\r\n{}", state.tree(&kimap::KIMAP_ROOT_HASH, 0)?);
+                Ok(())
             }
             Ok(ExplorerRequest::SubTree(root_hash)) => {
                 println!("tree:\r\n{}", state.tree(&root_hash, 0)?);
+                Ok(())
             }
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "got invalid message from {}: {:?}, {e:?}",
-                    source,
-                    std::str::from_utf8(&body)
-                ));
-            }
+            Err(e) => Err(anyhow::anyhow!(
+                "got invalid message from {}: {:?}, {e:?}",
+                source,
+                std::str::from_utf8(&body)
+            )),
         }
-        Ok(())
     }
 }
 
