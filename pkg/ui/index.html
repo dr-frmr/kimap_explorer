@@ -98,8 +98,17 @@
         }
 
         /* Data key styles */
+        .content {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .child-nodes {
+            order: 1;
+        }
+
         .data-keys {
-            margin-top: 5px;
+            order: 2;
         }
 
         .data-key {
@@ -119,9 +128,47 @@
             z-index: 1000;
         }
 
-        /* Content styles */
-        .content {
-            margin-left: 20px;
+        .note-input-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .note-input {
+            flex: 1;
+            min-width: 2rem;
+            padding: 0.5em;
+            border: 1px solid #93a1a1;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            background-color: #fdf6e3;
+            color: #657b83;
+        }
+
+        .note-input:focus {
+            outline: none;
+            border-color: #f1da7d;
+            box-shadow: 0 0 0 0.125rem rgba(38, 139, 210, 0.2);
+        }
+
+        .add-note-button {
+            padding: 0.5em 1em;
+            background-color: #f1da7d;
+            color: #fff;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: background-color 0.2s ease;
+        }
+
+        .add-note-button:hover {
+            background-color: #f4c300;
+        }
+
+        .add-note-button:active {
+            background-color: #f4c300;
         }
     </style>
 </head>
@@ -136,7 +183,65 @@
     </div>
     <div id="tree-container"></div>
 
-    <script>
+    <script type="module">
+        // wallet imports, constants, abis
+        import { createWeb3Modal, defaultWagmiConfig } from 'https://esm.sh/@web3modal/wagmi@5.0.6?bundle'
+        import { optimism } from 'https://esm.sh/viem/chains'
+        import { getAccount, writeContract, waitForTransactionReceipt } from 'https://esm.sh/@wagmi/core@2.x'
+        import { encodeFunctionData, encodePacked, stringToHex, parseAbi } from 'https://esm.sh/viem'
+
+        /// address and abi constants
+        const KINOMAP = "0x7290Aa297818d0b9660B2871Bb87f85a3f9B4559";
+        const KINO_ACCOUNT_IMPL = "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9";
+
+
+        const kinomapAbi = parseAbi([
+            "function mint(address, bytes calldata, bytes calldata, bytes calldata, address) external returns (address tba)",
+            "function note(bytes calldata,bytes calldata) external returns (bytes32)",
+            "function get(bytes32 node) external view returns (address tokenBoundAccount, address tokenOwner, bytes memory note)",
+        ]);
+
+        const mechAbi = parseAbi([
+            "function execute(address to, uint256 value, bytes calldata data, uint8 operation) returns (bytes memory returnData)",
+        ]);
+
+        // boilerplate wallet setup
+        const projectId = 'YOUR_PROJECT_ID'
+        const metadata = {
+            name: 'KIMAP Explorer',
+            description: 'KIMAP Explorer',
+            url: '',
+            icons: ['']
+        }
+        const chains = [optimism] // anvil too
+        const config = defaultWagmiConfig({
+            chains,
+            projectId,
+            metadata,
+        })
+
+        const modal = createWeb3Modal({
+            wagmiConfig: config,
+            projectId,
+            cacheProvider: true,
+        })
+
+        // todo make this better
+        console.log('modal...', modal);
+        // if (modal.cachedProvider) {
+        //     console.log('buteyko')
+        //     await modal.reconnect(config)
+        //     console.log('buteyko done')
+        // } else {
+        //     console.log('buteyko else')
+        //     await modal.connect(config)
+        //     console.log('buteyko else done')
+        // }
+        // await modal?.reconnect(config)
+
+
+
+        // GETs to kinode app
         async function fetchNode(hash) {
             const response = await fetch(`/kimap_explorer:kimap_explorer:mothu-et-doria.os/api/node/${hash}`);
             return await response.json();
@@ -147,9 +252,54 @@
             return await response.json();
         }
 
+
+        // chain interaction encoding functions
+        function mintFunction(our_address, nodename) {
+            return encodeFunctionData({
+                abi: kinomapAbi,
+                functionName: 'mint',
+                args: [
+                    our_address,
+                    encodePacked(["bytes"], [stringToHex(nodename)]),
+                    "0x", // empty initial calldata
+                    "0x", // empty erc721 details
+                    KINO_ACCOUNT_IMPL,
+                ]
+            })
+        }
+
+        function noteFunction(key, value) {
+            return encodeFunctionData({
+                abi: kinomapAbi,
+                functionName: 'note',
+                args: [
+                    encodePacked(["bytes"], [stringToHex(key)]),
+                    encodePacked(["bytes"], [stringToHex(value)]),
+                ]
+            });
+        }
+
+        function executeFunction(to, value, data, operation) {
+            return encodeFunctionData({
+                abi: mechAbi,
+                functionName: 'execute',
+                args: [to, BigInt(value), data, operation]
+            });
+        }
+
+        // rendering logic
         function createNodeElement(node, hash) {
+            // Check if the node already exists
+            const existingNode = document.querySelector(`[data-hash="${hash}"]`);
+            if (existingNode) {
+                // If it exists, update it instead of creating a new one
+                updateNodeElement(hash, node);
+                return existingNode;
+            }
+
             const nodeElement = document.createElement('div');
             nodeElement.className = 'node';
+            nodeElement.dataset.hash = hash;
 
             const headerElement = document.createElement('div');
             headerElement.className = 'node-header';
@@ -190,6 +340,19 @@
             contentContainer.style.display = 'none';
             nodeElement.appendChild(contentContainer);
 
+            const childNodesContainer = document.createElement('div');
+            childNodesContainer.className = 'child-nodes';
+            contentContainer.appendChild(childNodesContainer);
+
+            // Display child nodes 
+            if (childHashes.length > 0) {
+                for (const childHash of childHashes) {
+                    fetchNode(childHash).then(childNode => {
+                        const childElement = createNodeElement(childNode, childHash);
+                        childNodesContainer.appendChild(childElement);
+                    });
+                }
+            }
             // Display data keys
             if (dataKeys.length > 0) {
                 const dataKeysContainer = document.createElement('div');
@@ -207,7 +370,7 @@
                     const dataValueContainer = document.createElement('div');
                     dataValueContainer.className = 'info-container';
                     dataValueContainer.style.display = 'none';
-                    dataValueContainer.textContent = node.data_keys[key];
+                    dataValueContainer.textContent = tryParseUtf8(node.data_keys[key]);
                     dataKeyElement.appendChild(dataValueContainer);
 
                     dataValueButton.addEventListener('click', () => {
@@ -226,32 +389,210 @@
             <div>Owner: ${info.owner}</div>
             <div>TBA: ${info.tba}</div>
             <div>Data Hex: ${info.data_hex}</div>
+        `;
+                    const address = getAccount(config)?.address;
+                    // Add input fields and buttons if the user owns this node
+                    if (info.owner.toLowerCase() === address?.toLowerCase()) {
+                        const inputContainer = document.createElement('div');
+                        inputContainer.className = 'note-input-container';
+                        inputContainer.innerHTML = `
+                <input type="text" placeholder="Key" id="key-${hash}" class="note-input">
+                <input type="text" placeholder="Value" id="value-${hash}" class="note-input">
+                <button id="add-note-${hash}" class="add-note-button">Add Note</button>
+                <input type="text" placeholder="New Subname" id="subname-${hash}" class="note-input">
+                <button id="mint-subname-${hash}" class="add-note-button">Mint</button>
             `;
+                        infoContainer.appendChild(inputContainer);
+                        document.getElementById(`add-note-${hash}`).addEventListener('click', () => {
+                            const key = document.getElementById(`key-${hash}`).value;
+                            const value = document.getElementById(`value-${hash}`).value;
+                            addNote(hash, info.tba, info.owner, key, value);
+                        });
+                        document.getElementById(`mint-subname-${hash}`).addEventListener('click', () => {
+                            const subname = document.getElementById(`subname-${hash}`).value;
+                            addMint(hash, info.tba, info.owner, subname);
+                        });
+                    }
                 }
                 infoContainer.style.display = infoContainer.style.display === 'none' ? 'block' : 'none';
             });
 
             if (childHashes.length > 0 || dataKeys.length > 0) {
-                nameElement.addEventListener('click', async () => {
+                nameElement.addEventListener('click', () => {
                     const arrow = nameElement.querySelector('.arrow');
                     arrow.classList.toggle('expanded');
-
-                    if (contentContainer.children.length === childHashes.length + (dataKeys.length > 0 ? 1 : 0)) {
-                        contentContainer.style.display = contentContainer.style.display === 'none' ? 'block' : 'none';
-                        return;
-                    }
-
-                    // Fetch and display child nodes
-                    for (const childHash of childHashes) {
-                        const childNode = await fetchNode(childHash);
-                        contentContainer.appendChild(createNodeElement(childNode, childHash));
-                    }
-
-                    contentContainer.style.display = 'block';
+                    contentContainer.style.display = contentContainer.style.display === 'none' ? 'block' : 'none';
                 });
             }
 
             return nodeElement;
+        }
+
+        function updateNodeElement(hash, updatedInfo) {
+            const nodeElement = document.querySelector(`[data-hash="${hash}"]`);
+            if (!nodeElement) return;
+
+            const dataKeys = Object.keys(updatedInfo.data_keys || {});
+            const childHashes = Array.from(updatedInfo.child_hashes || []);
+
+            // Update node info
+            const infoElement = nodeElement.querySelector('.node-info');
+            if (infoElement) {
+                infoElement.textContent = ` (${dataKeys.length}, ${childHashes.length})`;
+            }
+
+
+            // Update child nodes
+            const contentContainer = nodeElement.querySelector('.content');
+            if (contentContainer) {
+                const existingChildNodes = contentContainer.querySelectorAll('.node');
+                const existingChildHashes = Array.from(existingChildNodes).map(node => node.dataset.hash);
+
+                // Remove child nodes that no longer exist
+                existingChildNodes.forEach(childNode => {
+                    if (!childHashes.includes(childNode.dataset.hash)) {
+                        contentContainer.removeChild(childNode);
+                    }
+                });
+
+                // Add new child nodes
+                for (const childHash of childHashes) {
+                    if (!existingChildHashes.includes(childHash)) {
+                        fetchNode(childHash).then(childNode => {
+                            const childElement = createNodeElement(childNode, childHash);
+                            contentContainer.appendChild(childElement);
+                        });
+                    }
+                }
+
+
+                // Update data keys
+                const dataKeysContainer = nodeElement.querySelector('.data-keys');
+                if (dataKeysContainer) {
+                    dataKeysContainer.innerHTML = ''; // Clear existing data keys
+                    for (const [key, value] of Object.entries(updatedInfo.data_keys || {})) {
+                        const dataKeyElement = document.createElement('div');
+                        dataKeyElement.className = 'data-key';
+                        dataKeyElement.textContent = key;
+
+                        const dataValueButton = document.createElement('button');
+                        dataValueButton.textContent = '📄';
+                        dataValueButton.className = 'info-button';
+                        dataKeyElement.appendChild(dataValueButton);
+
+                        const dataValueContainer = document.createElement('div');
+                        dataValueContainer.className = 'info-container';
+                        dataValueContainer.style.display = 'none';
+                        dataValueContainer.textContent = tryParseUtf8(value);
+                        dataKeyElement.appendChild(dataValueContainer);
+
+                        dataValueButton.addEventListener('click', () => {
+                            dataValueContainer.style.display = dataValueContainer.style.display === 'none' ? 'block' : 'none';
+                        });
+
+                        dataKeysContainer.appendChild(dataKeyElement);
+                    }
+                }
+            }
+
+            // Ensure arrow is visible if there are children
+            const arrow = nodeElement.querySelector('.arrow');
+            if (arrow) {
+                arrow.style.display = childHashes.length > 0 ? 'inline-block' : 'none';
+            }
+
+            // Ensure content container is visible if there are children
+            if (contentContainer && childHashes.length > 0) {
+                contentContainer.style.display = 'block';
+                arrow?.classList.add('expanded');
+            }
+        }
+
+        async function addNote(parenthash, tba, our_address, key, value) {
+            console.log(`Adding note to node ${our_address}: Key: ${key}, Value: ${value}, tba: ${tba}`);
+
+            if (!key || !value) {
+                alert('Please enter both key and value');
+                return;
+            }
+
+            try {
+                const noteData = noteFunction(key, value);
+
+                const result = await writeContract(config, {
+                    abi: mechAbi,
+                    address: tba,
+                    functionName: 'execute',
+                    args: [
+                        KINOMAP,
+                        0,
+                        noteData,
+                        0,
+                    ],
+                })
+
+                console.log('tx hash:', result);
+
+                const transactionReceipt = await waitForTransactionReceipt(config, {
+                    hash: result,
+                })
+                console.log('transaction receipt: ', transactionReceipt);
+
+                const updatedInfo = await fetchNode(parenthash);
+                updateNodeElement(parenthash, updatedInfo);
+            } catch (error) {
+                console.error('Error adding note:', error);
+                alert('Failed to add note. Please try again.');
+            }
+        }
+
+        async function addMint(parenthash, tba, our_address, nodename) {
+            console.log(`Adding mint to node ${our_address}: Name: ${nodename}, tba: ${tba}`);
+            try {
+                const mintData = mintFunction(our_address, nodename);
+
+                const result = await writeContract(config, {
+                    abi: mechAbi,
+                    address: tba,
+                    functionName: 'execute',
+                    args: [
+                        KINOMAP,
+                        0,
+                        mintData,
+                        0,
+                    ],
+                    gas: 1000000n,
+                })
+
+                console.log('tx hash:', result);
+
+                const transactionReceipt = await waitForTransactionReceipt(config, {
+                    hash: result,
+                })
+
+                const updatedInfo = await fetchNode(parenthash);
+                updateNodeElement(parenthash, updatedInfo);
+
+            } catch (error) {
+                console.error('Error adding note:', error);
+                alert('Failed to add note. Please try again.');
+            }
+        }
+
+        function tryParseUtf8(hexString) {
+            try {
+                // Remove '0x' prefix if present
+                const cleanHex = hexString.startsWith('0x') ? hexString.slice(2) : hexString;
+                const bytes = new Uint8Array(cleanHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                const decoded = new TextDecoder('utf-8').decode(bytes);
+                // Check if the decoded string contains only printable characters
+                if (/^[\x20-\x7E]*$/.test(decoded)) {
+                    return decoded;
+                }
+            } catch (error) {
+                console.warn('Failed to parse as UTF-8:', error);
+            }
+            return hexString; // Return original hex if parsing fails or result is not printable
         }
 
         async function renderTree() {
@@ -268,34 +609,6 @@
         }
 
         renderTree();
-    </script>
-
-    <script type="module">
-        import { createWeb3Modal, defaultWagmiConfig } from 'https://esm.sh/@web3modal/wagmi@5.0.6?bundle'
-        import { optimism } from 'https://esm.sh/viem/chains'
-        import { connect } from 'https://esm.sh/@wagmi/core@2.x'
-
-        const projectId = 'YOUR_PROJECT_ID'
-
-        const metadata = {
-            name: 'KIMAP Explorer',
-            description: 'KIMAP Explorer',
-            url: '',
-            icons: ['https://i.imgur.com/FFgKZ1O.png']
-        }
-
-        const chains = [optimism]
-        const config = defaultWagmiConfig({
-            chains,
-            projectId,
-            metadata,
-        })
-        connect(config)
-
-        const modal = createWeb3Modal({
-            wagmiConfig: config,
-            projectId,
-        })
     </script>
 </body>
 
