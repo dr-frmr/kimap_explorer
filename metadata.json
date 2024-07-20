@@ -6,9 +6,11 @@
         "package_name": "kimap_explorer",
         "current_version": "0.1.0",
         "publisher": "mothu-et-doria.os",
-        "mirrors": [],
+        "mirrors": [
+            "hexencode1.os"
+        ],
         "code_hashes": {
-            "0.1.0": ""
+            "0.1.0": "da2695be0a437931527955e2232c1bea63a7d20c00d5481a3ae691d1f110b796"
         },
         "wit_version": 0,
         "dependencies": []
