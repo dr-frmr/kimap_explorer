@@ -5,12 +5,12 @@
     "properties": {
         "package_name": "kimap_explorer",
         "current_version": "0.1.0",
-        "publisher": "mothu-et-doria.os",
+        "publisher": "hexencode1.os",
         "mirrors": [
             "hexencode1.os"
         ],
         "code_hashes": {
-            "0.1.0": "da2695be0a437931527955e2232c1bea63a7d20c00d5481a3ae691d1f110b796"
+            "0.1.0": "1b2d29c52a3af28a02fddc2abbfb3a375b26ef6be1451bb782491187ea1279d9"
         },
         "wit_version": 0,
         "dependencies": []

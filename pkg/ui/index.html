@@ -243,12 +243,12 @@
 
         // GETs to kinode app
         async function fetchNode(hash) {
-            const response = await fetch(`/kimap_explorer:kimap_explorer:mothu-et-doria.os/api/node/${hash}`);
+            const response = await fetch(`/kimap_explorer:kimap_explorer:hexencode1.os/api/node/${hash}`);
             return await response.json();
         }
 
         async function fetchNodeInfo(hash) {
-            const response = await fetch(`/kimap_explorer:kimap_explorer:mothu-et-doria.os/api/info/${hash}`);
+            const response = await fetch(`/kimap_explorer:kimap_explorer:hexencode1.os/api/info/${hash}`);
             return await response.json();
         }
 
@@ -344,7 +344,7 @@
             childNodesContainer.className = 'child-nodes';
             contentContainer.appendChild(childNodesContainer);
 
-            // Display child nodes 
+            // Display child nodes
             if (childHashes.length > 0) {
                 for (const childHash of childHashes) {
                     fetchNode(childHash).then(childNode => {
