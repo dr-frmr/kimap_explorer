@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 wit_bindgen::generate!({
     path: "target/wit",
-    world: "kimap-explorer-hexencode1-dot-os-v0",
+    world: "kimap-explorer-pacificat-dot-os-v0",
     generate_unused_types: true,
     additional_derives: [serde::Deserialize, serde::Serialize],
 });

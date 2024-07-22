@@ -5,12 +5,12 @@
     "properties": {
         "package_name": "kimap_explorer",
         "current_version": "0.1.0",
-        "publisher": "atlantico.os",
+        "publisher": "pacificat.os",
         "mirrors": [
-            "atlantico.os"
+            "pacificat.os"
         ],
         "code_hashes": {
-            "0.1.0": "26c9a1d3cf7e51c2d3e1c0be524d2dafe02ca6caa48780b8c4f64018a3dc1ca3"
+            "0.1.0": "76ab687234ee5d4ae13d9ac4da318458e8ff2819573c5f0171830782da52875e"
         },
         "wit_version": 0,
         "dependencies": []
