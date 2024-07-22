@@ -5,12 +5,12 @@
     "properties": {
         "package_name": "kimap_explorer",
         "current_version": "0.1.0",
-        "publisher": "hexencode1.os",
+        "publisher": "atlantico.os",
         "mirrors": [
-            "hexencode1.os"
+            "atlantico.os"
         ],
         "code_hashes": {
-            "0.1.0": "64a43d2422839cf339f9df5b22cd56e7a5cd2612d7a022bce7e78e59dfaad0ce"
+            "0.1.0": "26c9a1d3cf7e51c2d3e1c0be524d2dafe02ca6caa48780b8c4f64018a3dc1ca3"
         },
         "wit_version": 0,
         "dependencies": []
