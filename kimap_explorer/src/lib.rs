@@ -190,11 +190,22 @@ fn init(our: Address) {
         }
     }
 
-    http::serve_ui(&our, "ui", false, false, vec!["/"]).unwrap();
+    let mut http_server = http::server::HttpServer::new(5);
+    let http_config = http::server::HttpBindingConfig::default();
 
-    http::bind_http_path("/api/tree", false, false).unwrap();
-    http::bind_http_path("/api/node/:hash", false, false).unwrap();
-    http::bind_http_path("/api/info/:hash", false, false).unwrap();
+    http_server
+        .serve_ui(&our, "ui", vec!["/"], http_config.clone())
+        .unwrap();
+
+    http_server
+        .bind_http_path("/api/tree", http_config.clone())
+        .unwrap();
+    http_server
+        .bind_http_path("/api/node/:hash", http_config.clone())
+        .unwrap();
+    http_server
+        .bind_http_path("/api/info/:hash", http_config)
+        .unwrap();
 
     loop {
         match await_message() {
@@ -229,11 +240,11 @@ fn handle_message(
             }
         }
     } else if source.process == "http_server:distro:sys" {
-        if let Ok(http::HttpServerRequest::Http(req)) = serde_json::from_slice(&body) {
+        if let Ok(http::server::HttpServerRequest::Http(req)) = serde_json::from_slice(&body) {
             if req.path()? == "/api/tree" {
                 let tree = state.get_node_json(&kimap::KIMAP_ROOT_HASH)?;
                 let headers = HashMap::from([("Content-Type".into(), "application/json".into())]);
-                http::send_response(
+                http::server::send_response(
                     http::StatusCode::OK,
                     Some(headers),
                     tree.to_string().as_bytes().to_vec(),
@@ -242,7 +253,7 @@ fn handle_message(
                 let hash = req.url_params().get("hash").unwrap();
                 let node = state.get_node_json(&hash)?;
                 let headers = HashMap::from([("Content-Type".into(), "application/json".into())]);
-                http::send_response(
+                http::server::send_response(
                     http::StatusCode::OK,
                     Some(headers),
                     node.to_string().as_bytes().to_vec(),
@@ -261,16 +272,16 @@ fn handle_message(
                     let headers =
                         HashMap::from([("Content-Type".into(), "application/json".into())]);
 
-                    http::send_response(
+                    http::server::send_response(
                         http::StatusCode::OK,
                         Some(headers),
                         info.to_string().as_bytes().to_vec(),
                     );
                 } else {
-                    http::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
+                    http::server::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
                 }
             } else {
-                http::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
+                http::server::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
             }
         }
         Ok(())
@@ -328,7 +339,7 @@ fn handle_log(_our: &Address, state: &mut State, log: &eth::Log) -> anyhow::Resu
         kimap::contract::Note::SIGNATURE_HASH => {
             let decoded = kimap::contract::Note::decode_log_data(log.data(), true).unwrap();
 
-            let parent_hash = decoded.nodehash.to_string();
+            let parent_hash = decoded.parenthash.to_string();
             let note = String::from_utf8(decoded.note.to_vec())?;
 
             println!("got note: {note}, node_hash: {parent_hash}",);
