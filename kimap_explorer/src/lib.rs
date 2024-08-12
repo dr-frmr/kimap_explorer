@@ -28,6 +28,7 @@ struct State {
     pub kimap: kimap::Kimap,
     // map from an entry hash to its information
     pub index: BTreeMap<String, NamespaceEntry>,
+    pub note_queue: HashMap<String, Vec<(String, eth::Bytes)>>,
 }
 
 impl State {
@@ -43,6 +44,7 @@ impl State {
                     data_keys: BTreeMap::new(),
                 },
             )]),
+            note_queue: HashMap::new(),
         }
     }
 
@@ -62,7 +64,7 @@ impl State {
         let parent_path = parent.name.clone() + &parent.parent_path;
 
         self.index.insert(
-            child_hash,
+            child_hash.clone(),
             NamespaceEntry {
                 parent_path,
                 name,
@@ -70,6 +72,13 @@ impl State {
                 data_keys: BTreeMap::new(),
             },
         );
+
+        if let Some(notes) = self.note_queue.remove(&child_hash) {
+            for (note, data) in notes {
+                println!("applying queued note: {note}");
+                self.add_note(&child_hash, note, data)?;
+            }
+        }
 
         Ok(())
     }
@@ -80,13 +89,18 @@ impl State {
         note: String,
         data: eth::Bytes,
     ) -> anyhow::Result<()> {
-        let parent = self
-            .index
-            .get_mut(parent_hash)
-            .ok_or(anyhow::anyhow!("parent not found"))?;
-
-        parent.data_keys.insert(note, data);
-
+        match self.index.get_mut(parent_hash) {
+            Some(parent) => {
+                parent.data_keys.insert(note, data);
+            }
+            None => {
+                println!("parent not found, queueing note: {note}");
+                self.note_queue
+                    .entry(parent_hash.to_string())
+                    .or_insert(vec![])
+                    .push((note, data));
+            }
+        }
         Ok(())
     }
 
