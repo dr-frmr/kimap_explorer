@@ -165,8 +165,9 @@ fn init(our: Address) {
         .from_block(kimap::KIMAP_FIRST_BLOCK)
         .to_block(eth::BlockNumberOrTag::Latest)
         .events(vec![
-            "Mint(bytes32,bytes32,bytes,bytes)",
-            "Note(bytes32,bytes32,bytes,bytes,bytes)",
+            kimap::contract::Mint::SIGNATURE,
+            kimap::contract::Note::SIGNATURE,
+            kimap::contract::Fact::SIGNATURE,
         ]);
 
     state.kimap.provider.subscribe_loop(1, filter.clone());
@@ -328,7 +329,7 @@ fn handle_log(_our: &Address, state: &mut State, log: &eth::Log) -> anyhow::Resu
 
             let parent_hash = decoded.parenthash.to_string();
             let child_hash = decoded.childhash.to_string();
-            let label = String::from_utf8(decoded.name.to_vec())?;
+            let label = String::from_utf8(decoded.label.to_vec())?;
 
             println!("got mint: {label}, parent_hash: {parent_hash}, child_hash: {child_hash}");
             match state.add_mint(&parent_hash, child_hash, label) {
@@ -340,11 +341,23 @@ fn handle_log(_our: &Address, state: &mut State, log: &eth::Log) -> anyhow::Resu
             let decoded = kimap::contract::Note::decode_log_data(log.data(), true).unwrap();
 
             let parent_hash = decoded.parenthash.to_string();
-            let note = String::from_utf8(decoded.note.to_vec())?;
+            let note_label = String::from_utf8(decoded.label.to_vec())?;
 
-            println!("got note: {note}, node_hash: {parent_hash}",);
-            match state.add_note(&parent_hash, note, decoded.data) {
+            println!("got note: {note_label}, node_hash: {parent_hash}",);
+            match state.add_note(&parent_hash, note_label, decoded.data) {
                 Ok(()) => println!("added note to index"),
+                Err(e) => println!("ERROR: {e}"),
+            }
+        }
+        kimap::contract::Fact::SIGNATURE_HASH => {
+            let decoded = kimap::contract::Fact::decode_log_data(log.data(), true).unwrap();
+
+            let parent_hash = decoded.parenthash.to_string();
+            let fact_label = String::from_utf8(decoded.label.to_vec())?;
+
+            println!("got fact: {fact_label}, node_hash: {parent_hash}",);
+            match state.add_note(&parent_hash, fact_label, decoded.data) {
+                Ok(()) => println!("added fact to index"),
                 Err(e) => println!("ERROR: {e}"),
             }
         }
