@@ -3,6 +3,9 @@ name = "kimap_explorer"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+test = []
+
 [dependencies]
 alloy-sol-types = "0.7.6"
 anyhow = "1.0"
