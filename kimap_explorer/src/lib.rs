@@ -158,6 +158,8 @@ call_init!(init);
 fn init(our: Address) {
     println!("online");
 
+    kinode_process_lib::homepage::add_to_homepage("Kimap Explorer", None, Some("/"), None);
+
     let mut state = State::new();
 
     let filter = eth::Filter::new()
