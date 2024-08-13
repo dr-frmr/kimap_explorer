@@ -1,11 +1,6 @@
 /* General styles */
-body {
-    font-family: Arial, sans-serif;
-    line-height: 1.6;
-    color: #586e75;
-    margin: 0;
-    padding: 0;
-    background-color: #fdf6e3;
+* {
+    font-family: "Kode Mono", monospace;
 }
 
 .app-container {
@@ -22,13 +17,13 @@ body {
 }
 
 .app-title {
-    color: #073642;
+    color: light-dark(#073642, #1cc6f1);
     margin: 0;
 }
 
 /* KimapExplorer styles */
 .explorer-container {
-    background-color: #eee8d5;
+    background-color: light-dark(#eee8d5, #073642);
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -36,13 +31,13 @@ body {
 
 .explorer-explanation {
     font-style: italic;
-    color: #657b83;
+    color: light-dark(#657b83, #a7e2f1);
     margin-bottom: 20px;
 }
 
 /* TreeContainer styles */
 .tree-container {
-    background-color: #fdf6e3;
+    background-color: light-dark(#fdf6e3, #073642);
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -63,17 +58,17 @@ body {
 }
 
 .node-header:hover {
-    background-color: #eee8d5;
+    background-color: light-dark(#eee8d5, #073642);
 }
 
 .node-name {
     font-weight: bold;
     margin-right: 10px;
-    color: #073642;
+    color: light-dark(#073642, #1cc6f1);
 }
 
 .node-info {
-    color: #657b83;
+    color: light-dark(#657b83, #a7e2f1);
     font-size: 0.9em;
 }
 
@@ -82,7 +77,7 @@ body {
     height: 0;
     border-top: 5px solid transparent;
     border-bottom: 5px solid transparent;
-    border-left: 5px solid #586e75;
+    border-left: 5px solid light-dark(#586e75, #a7e2f1);
     margin-right: 10px;
     transition: transform 0.3s ease;
 }
@@ -103,7 +98,7 @@ body {
 .content {
     margin-left: 20px;
     padding-left: 10px;
-    border-left: 1px solid #93a1a1;
+    border-left: 1px solid light-dark(#93a1a1, #a7e2f1);
 }
 
 .child-nodes {
@@ -122,22 +117,24 @@ body {
 
 /* InfoContainer styles */
 .info-container {
-    background-color: #eee8d5;
+    background-color: light-dark(#eee8d5, #073642);
     border: 1px solid #93a1a1;
     border-radius: 4px;
     padding: 15px;
     margin-top: 10px;
     font-size: 0.9em;
+    max-width: 80%;
+    word-wrap: break-word;
 }
 
 .info-container h3 {
     margin-top: 0;
-    color: #073642;
+    color: light-dark(#073642, #1cc6f1);
 }
 
 .info-container p {
     margin: 5px 0;
-    color: #586e75;
+    color: light-dark(#586e75, #a7e2f1);
 }
 
 .info-container input[type="text"] {
@@ -146,12 +143,12 @@ body {
     margin: 5px 0;
     border: 1px solid #93a1a1;
     border-radius: 4px;
-    background-color: #fdf6e3;
+    background-color: light-dark(#fdf6e3, #073642);
 }
 
 .info-container button {
-    background-color: #268bd2;
-    color: #fdf6e3;
+    background-color: light-dark(#268bd2, #1cc6f1);
+    color: light-dark(#fdf6e3, #073642);
     border: none;
     padding: 5px 10px;
     border-radius: 4px;

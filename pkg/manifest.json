@@ -5,6 +5,7 @@
         "on_exit": "Restart",
         "request_networking": false,
         "request_capabilities": [
+            "homepage:homepage:sys",
             "http_server:distro:sys",
             "eth:distro:sys",
             "vfs:distro:sys"
