@@ -973,6 +973,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "explorer"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types",
+ "anyhow",
+ "bincode",
+ "kinode_process_lib",
+ "serde",
+ "serde_json",
+ "wit-bindgen",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1444,19 +1457,6 @@ checksum = "422fbc7ff2f2f5bdffeb07718e5a5324dca72b0c9293d50df4026652385e3314"
 dependencies = [
  "digest 0.10.7",
  "sha3-asm",
-]
-
-[[package]]
-name = "kimap_explorer"
-version = "0.1.0"
-dependencies = [
- "alloy-sol-types",
- "anyhow",
- "bincode",
- "kinode_process_lib",
- "serde",
- "serde_json",
- "wit-bindgen",
 ]
 
 [[package]]

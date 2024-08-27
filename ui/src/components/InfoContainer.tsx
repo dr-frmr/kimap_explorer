@@ -34,9 +34,9 @@ const InfoContainer: React.FC<InfoContainerProps> = ({ hash, refetchNode }) => {
                 addRecentTransaction({ hash: tx_hash, description: `minting name ${subname}` });
             },
             onSettled: () => {
-                // arbitrary temporary sleep for tx to index in kimap_explorer app
+                // arbitrary temporary sleep for tx to index in kimap-explorer app
                 // can also listen to events on the frontend here, but tbh I'd rather put tx building completely to the backend
-                // 
+                //
                 setTimeout(() => {
                     refetchNode();
                 }, 3500);

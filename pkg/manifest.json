@@ -1,7 +1,7 @@
 [
     {
-        "process_name": "kimap_explorer",
-        "process_wasm_path": "/kimap_explorer.wasm",
+        "process_name": "explorer",
+        "process_wasm_path": "/explorer.wasm",
         "on_exit": "Restart",
         "request_networking": false,
         "request_capabilities": [
