@@ -2,6 +2,8 @@ use alloy_sol_types::SolEvent;
 use kinode_process_lib::{await_message, call_init, eth, http, kimap, println, Address, Message};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+#[cfg(feature = "test")]
+use std::str::FromStr;
 
 wit_bindgen::generate!({
     path: "target/wit",
@@ -9,6 +11,11 @@ wit_bindgen::generate!({
     generate_unused_types: true,
     additional_derives: [serde::Deserialize, serde::Serialize],
 });
+
+#[cfg(feature = "test")]
+const FAKENODE_KIMAP_CHAIN_ID: u64 = 31337;
+#[cfg(feature = "test")]
+const FAKENODE_KIMAP_ADDRESS: &str = "0xEce71a05B36CA55B895427cD9a440eEF7Cf3669D";
 
 #[derive(Deserialize, Serialize)]
 enum ExplorerRequest {
@@ -33,7 +40,13 @@ struct State {
 impl State {
     pub fn new() -> Self {
         Self {
+            #[cfg(not(feature = "test"))]
             kimap: kimap::Kimap::default(60),
+            #[cfg(feature = "test")]
+            kimap: kimap::Kimap::new(
+                eth::Provider::new(FAKENODE_KIMAP_CHAIN_ID, 60),
+                eth::Address::from_str(FAKENODE_KIMAP_ADDRESS).unwrap(),
+            ),
             index: BTreeMap::from([(
                 kimap::KIMAP_ROOT_HASH.to_string(),
                 NamespaceEntry {
