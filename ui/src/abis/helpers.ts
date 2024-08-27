@@ -3,12 +3,12 @@ import { kinomapAbi, KINO_ACCOUNT_IMPL } from "./";
 
 // GETs to kinode app
 export async function fetchNode(hash: string) {
-    const response = await fetch(`/kimap_explorer:kimap_explorer:pacificat.os/api/node/${hash}`);
+    const response = await fetch(`/explorer:kimap-explorer:doria.kino/api/node/${hash}`);
     return await response.json();
 }
 
 export async function fetchNodeInfo(hash: string) {
-    const response = await fetch(`/kimap_explorer:kimap_explorer:pacificat.os/api/info/${hash}`);
+    const response = await fetch(`/explorer:kimap-explorer:doria.kino/api/info/${hash}`);
     return await response.json();
 }
 

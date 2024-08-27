@@ -10,7 +10,7 @@ const KimapExplorer: React.FC = () => {
 
     const fetchRootNode = async () => {
         try {
-            const response = await fetch('/kimap_explorer:kimap_explorer:pacificat.os/api/node/0x0000000000000000000000000000000000000000000000000000000000000000');
+            const response = await fetch('/explorer:kimap-explorer:doria.kino/api/node/0x0000000000000000000000000000000000000000000000000000000000000000');
             const data = await response.json();
             setRootNode(data);
         } catch (error) {

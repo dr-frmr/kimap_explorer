@@ -1,7 +1,7 @@
 interface kimap-explorer {
 }
 
-world kimap-explorer-pacificat-dot-os-v0 {
+world kimap-explorer-doria-dot-kino-v0 {
     import kimap-explorer;
     include process-v0;
 }

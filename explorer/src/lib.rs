@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 wit_bindgen::generate!({
     path: "target/wit",
-    world: "kimap-explorer-pacificat-dot-os-v0",
+    world: "kimap-explorer-doria-dot-kino-v0",
     generate_unused_types: true,
     additional_derives: [serde::Deserialize, serde::Serialize],
 });
@@ -170,6 +170,8 @@ impl State {
 call_init!(init);
 fn init(our: Address) {
     println!("online");
+
+    kinode_process_lib::homepage::add_to_homepage("Kimap Explorer", None, Some("/"), None);
 
     let mut state = State::new();
 
@@ -344,9 +346,9 @@ fn handle_log(_our: &Address, state: &mut State, log: &eth::Log) -> anyhow::Resu
             let child_hash = decoded.childhash.to_string();
             let label = String::from_utf8(decoded.label.to_vec())?;
 
-            println!("got mint: {label}, parent_hash: {parent_hash}, child_hash: {child_hash}");
+            // println!("got mint: {label}, parent_hash: {parent_hash}, child_hash: {child_hash}");
             match state.add_mint(&parent_hash, child_hash, label) {
-                Ok(()) => println!("added entry to index"),
+                Ok(()) => (), // println!("added entry to index"),
                 Err(e) => println!("ERROR: {e}"),
             }
         }
@@ -356,9 +358,9 @@ fn handle_log(_our: &Address, state: &mut State, log: &eth::Log) -> anyhow::Resu
             let parent_hash = decoded.parenthash.to_string();
             let note_label = String::from_utf8(decoded.label.to_vec())?;
 
-            println!("got note: {note_label}, node_hash: {parent_hash}",);
+            // println!("got note: {note_label}, node_hash: {parent_hash}",);
             match state.add_note(&parent_hash, note_label, decoded.data) {
-                Ok(()) => println!("added note to index"),
+                Ok(()) => (), // println!("added note to index"),
                 Err(e) => println!("ERROR: {e}"),
             }
         }
@@ -368,9 +370,9 @@ fn handle_log(_our: &Address, state: &mut State, log: &eth::Log) -> anyhow::Resu
             let parent_hash = decoded.parenthash.to_string();
             let fact_label = String::from_utf8(decoded.label.to_vec())?;
 
-            println!("got fact: {fact_label}, node_hash: {parent_hash}",);
+            // println!("got fact: {fact_label}, node_hash: {parent_hash}",);
             match state.add_note(&parent_hash, fact_label, decoded.data) {
-                Ok(()) => println!("added fact to index"),
+                Ok(()) => (), // println!("added fact to index"),
                 Err(e) => println!("ERROR: {e}"),
             }
         }

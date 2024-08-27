@@ -1,16 +1,16 @@
 {
-    "name": "kimap_explorer",
-    "description": "",
+    "name": "kimap-explorer",
+    "description": "A simple browsing tool for the Kimap namespace",
     "image": "",
     "properties": {
-        "package_name": "kimap_explorer",
+        "package_name": "kimap-explorer",
         "current_version": "0.1.0",
-        "publisher": "pacificat.os",
+        "publisher": "doria.kino",
         "mirrors": [
-            "pacificat.os"
+            "doria.kino"
         ],
         "code_hashes": {
-            "0.1.0": "76ab687234ee5d4ae13d9ac4da318458e8ff2819573c5f0171830782da52875e"
+            "0.1.0": "d9284fd116811aa7f07a611014ef2e64737fc7c50d61a0454723ea8a4548bb56"
         },
         "wit_version": 0,
         "dependencies": []
