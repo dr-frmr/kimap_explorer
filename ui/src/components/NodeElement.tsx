@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import InfoContainer from './InfoContainer';
-import DataKeyElement from './DataKeyElement';
-import { fetchNode } from '../abis/helpers';
+import { DataKeyElement, DataKey } from './DataKeyElement';
+import { fetchNode } from '../helpers';
 
 interface NodeElementProps {
     hash: string;
@@ -9,14 +9,16 @@ interface NodeElementProps {
 
 interface Node {
     name: string;
+    parent_path: string;
     child_hashes: string[];
-    data_keys: Record<string, string>;
+    data_keys: Record<string, DataKey>;
 }
 
 const NodeElement: React.FC<NodeElementProps> = ({ hash }) => {
     const [node, setNode] = useState<Node | null>(null);
     const [expanded, setExpanded] = useState(false);
     const [infoVisible, setInfoVisible] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchNodeData();
@@ -25,17 +27,30 @@ const NodeElement: React.FC<NodeElementProps> = ({ hash }) => {
     const fetchNodeData = async () => {
         try {
             const data = await fetchNode(hash);
-            // console.log('fetched node', data);
             setNode(data);
         } catch (error) {
             console.error('Error fetching node:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
-    if (!node) return null;
-
     const toggleExpanded = () => setExpanded(!expanded);
     const toggleInfo = () => setInfoVisible(!infoVisible);
+
+    // Show a minimal placeholder while loading
+    if (loading && !node) {
+        return (
+            <div className="node" data-hash={hash}>
+                <div className="node-header">
+                    <span className="node-name">Loading...</span>
+                </div>
+            </div>
+        );
+    }
+
+    // After loading, if no node was found
+    if (!node) return null;
 
     const hasChildren = node.child_hashes.length > 0 || Object.keys(node.data_keys).length > 0;
 
@@ -60,8 +75,8 @@ const NodeElement: React.FC<NodeElementProps> = ({ hash }) => {
                         ))}
                     </div>
                     <div className="data-keys">
-                        {Object.entries(node.data_keys).map(([key, value]) => (
-                            <DataKeyElement key={key} dataKey={key} dataValue={value as string} />
+                        {Object.entries(node.data_keys).map(([label, data_key]) => (
+                            <DataKeyElement key={label} dataKey={label} dataValue={data_key} />
                         ))}
                     </div>
                 </div>

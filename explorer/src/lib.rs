@@ -1,69 +1,179 @@
 use alloy_sol_types::SolEvent;
-use kinode_process_lib::{await_message, call_init, eth, http, kimap, println, Address, Message};
+use kinode::process::kimap_explorer::{Name, Namehash, Request as ExplorerRequest};
+use kinode_app_framework::{app, eth, http, kimap, println, Address, Message};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 wit_bindgen::generate!({
     path: "target/wit",
-    world: "kimap-explorer-doria-dot-kino-v0",
+    world: "kimap-explorer-doria-dot-kino-v1",
     generate_unused_types: true,
-    additional_derives: [serde::Deserialize, serde::Serialize],
+    additional_derives: [serde::Deserialize, serde::Serialize, kinode_app_framework::SerdeJsonInto],
 });
 
-#[derive(Deserialize, Serialize)]
-enum ExplorerRequest {
-    Tree,
-    SubTree(String),
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+enum Req {
+    ExplorerRequest(ExplorerRequest),
+    Eth(eth::EthSubResult),
 }
 
-#[derive(Deserialize, Serialize)]
-struct NamespaceEntry {
+#[derive(Debug, Deserialize, Serialize)]
+enum HttpApi {
+    /// fetch node info indexed within this app
+    GetNode(Namehash),
+    /// fetch onchain tba and owner for a node
+    GetTba(Namehash),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+enum DataKey {
+    /// facts are immutable
+    Fact(eth::Bytes),
+    /// notes are mutable: we store all versions of the note, most recent last
+    /// if indexing full history, this will be the note's full history --
+    /// it is also possible to receive a snapshot and not have updates from before that.
+    Note(Vec<eth::Bytes>),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Node {
+    /// everything that comes before a name, from root, with dots separating and a leading dot
     pub parent_path: String,
-    pub name: String,
-    pub child_hashes: BTreeSet<String>,
-    pub data_keys: BTreeMap<String, eth::Bytes>,
+    /// the name of the node -- a string.
+    pub name: Name,
+    /// the child namehashes of the node
+    pub child_hashes: BTreeSet<Namehash>,
+    /// the node's data keys
+    pub data_keys: BTreeMap<String, DataKey>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
 struct State {
     pub kimap: kimap::Kimap,
-    // map from an entry hash to its information
-    pub index: BTreeMap<String, NamespaceEntry>,
+    /// lookup table from name to namehash
+    pub names: BTreeMap<Name, Namehash>,
+    /// map from a namehash to its information
+    pub index: BTreeMap<String, Node>,
 }
 
-impl State {
-    pub fn new() -> Self {
-        Self {
-            kimap: kimap::Kimap::default(60),
+impl kinode_app_framework::State for State {
+    /// generate a new state and subscribe to the kimap and catch up on logs from genesis
+    fn new() -> Self {
+        let kimap = kimap::Kimap::default(60);
+
+        kimap
+            .provider
+            .subscribe_loop(1, Self::make_filter(&kimap), 0, 0);
+
+        let mut new_state = Self {
+            kimap: kimap.clone(),
+            names: BTreeMap::new(),
             index: BTreeMap::from([(
                 kimap::KIMAP_ROOT_HASH.to_string(),
-                NamespaceEntry {
-                    parent_path: "".to_string(),
-                    name: "".to_string(),
+                Node {
+                    parent_path: String::new(),
+                    name: String::new(),
                     child_hashes: BTreeSet::new(),
                     data_keys: BTreeMap::new(),
                 },
             )]),
+        };
+
+        loop {
+            match kimap.provider.get_logs(&Self::make_filter(&kimap)) {
+                Ok(logs) => {
+                    for log in logs {
+                        if let Err(e) = new_state.handle_log(&log) {
+                            println!("log-handling error! {e:?}");
+                        }
+                    }
+                    break;
+                }
+                Err(e) => {
+                    println!("got eth error while fetching logs: {e:?}, trying again in 5s...");
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    continue;
+                }
+            }
         }
+
+        new_state
+    }
+}
+
+impl State {
+    pub fn make_filter(kimap: &kimap::Kimap) -> eth::Filter {
+        eth::Filter::new()
+            .address(*kimap.address())
+            .from_block(kimap::KIMAP_FIRST_BLOCK)
+            .to_block(eth::BlockNumberOrTag::Latest)
+            .events(vec![
+                kimap::contract::Mint::SIGNATURE,
+                kimap::contract::Note::SIGNATURE,
+                kimap::contract::Fact::SIGNATURE,
+            ])
+    }
+
+    pub fn handle_log(&mut self, log: &eth::Log) -> anyhow::Result<()> {
+        match log.topics()[0] {
+            kimap::contract::Mint::SIGNATURE_HASH => {
+                let decoded = kimap::contract::Mint::decode_log_data(log.data(), true).unwrap();
+
+                let parent_hash = decoded.parenthash.to_string();
+                let child_hash = decoded.childhash.to_string();
+                let label = String::from_utf8(decoded.label.to_vec())?;
+
+                self.add_mint(&parent_hash, child_hash, label)?;
+            }
+            kimap::contract::Note::SIGNATURE_HASH => {
+                let decoded = kimap::contract::Note::decode_log_data(log.data(), true).unwrap();
+
+                let parent_hash = decoded.parenthash.to_string();
+                let note_label = String::from_utf8(decoded.label.to_vec())?;
+
+                self.add_note(&parent_hash, note_label, decoded.data)?;
+            }
+            kimap::contract::Fact::SIGNATURE_HASH => {
+                let decoded = kimap::contract::Fact::decode_log_data(log.data(), true).unwrap();
+
+                let parent_hash = decoded.parenthash.to_string();
+                let fact_label = String::from_utf8(decoded.label.to_vec())?;
+
+                self.add_fact(&parent_hash, fact_label, decoded.data)?;
+            }
+            _ => {}
+        }
+
+        Ok(())
     }
 
     pub fn add_mint(
         &mut self,
         parent_hash: &str,
-        child_hash: String,
-        name: String,
+        child_hash: Namehash,
+        name: Name,
     ) -> anyhow::Result<()> {
-        let parent = self
+        let parent_node: &mut Node = self
             .index
             .get_mut(parent_hash)
-            .ok_or(anyhow::anyhow!("parent not found"))?;
+            .ok_or(anyhow::anyhow!("parent for child {child_hash} not found!"))?;
 
-        parent.child_hashes.insert(child_hash.clone());
+        parent_node.child_hashes.insert(child_hash.clone());
 
-        let parent_path = parent.name.clone() + &parent.parent_path;
+        let parent_path: String = if parent_hash == kimap::KIMAP_ROOT_HASH {
+            String::new()
+        } else if parent_node.parent_path.is_empty() {
+            format!(".{}", parent_node.name)
+        } else {
+            format!(".{}.{}", parent_node.name, parent_node.parent_path)
+        };
 
+        self.names
+            .insert(format!("{}{}", name, parent_path), child_hash.clone());
         self.index.insert(
             child_hash,
-            NamespaceEntry {
+            Node {
                 parent_path,
                 name,
                 child_hashes: BTreeSet::new(),
@@ -77,26 +187,55 @@ impl State {
     pub fn add_note(
         &mut self,
         parent_hash: &str,
-        note: String,
+        note_label: String,
         data: eth::Bytes,
     ) -> anyhow::Result<()> {
-        let parent = self
-            .index
-            .get_mut(parent_hash)
-            .ok_or(anyhow::anyhow!("parent not found"))?;
+        let parent: &mut Node = self.index.get_mut(parent_hash).ok_or(anyhow::anyhow!(
+            "parent {parent_hash} not found for note {note_label}"
+        ))?;
 
-        parent.data_keys.insert(note, data);
+        match parent.data_keys.entry(note_label) {
+            std::collections::btree_map::Entry::Vacant(e) => {
+                e.insert(DataKey::Note(vec![data]));
+            }
+            std::collections::btree_map::Entry::Occupied(mut e) => {
+                if let DataKey::Note(ref mut notes) = e.get_mut() {
+                    notes.push(data);
+                }
+            }
+        }
 
         Ok(())
     }
 
-    pub fn tree(&self, root_hash: &str, nest_level: usize) -> anyhow::Result<String> {
-        let root = self
-            .index
-            .get(root_hash)
-            .ok_or(anyhow::anyhow!("root not found"))?;
+    pub fn add_fact(
+        &mut self,
+        parent_hash: &str,
+        fact_label: String,
+        data: eth::Bytes,
+    ) -> anyhow::Result<()> {
+        let parent: &mut Node = self.index.get_mut(parent_hash).ok_or(anyhow::anyhow!(
+            "parent {parent_hash} not found for fact {fact_label}"
+        ))?;
 
-        Ok(format!(
+        // this should never ever happen
+        if parent.data_keys.contains_key(&fact_label) {
+            return Err(anyhow::anyhow!(
+                "fact {fact_label} already exists on parent {parent_hash}"
+            ));
+        }
+
+        parent.data_keys.insert(fact_label, DataKey::Fact(data));
+
+        Ok(())
+    }
+
+    pub fn tree(&self, root_hash: &str, nest_level: usize) -> String {
+        let Some(root) = self.index.get(root_hash) else {
+            return String::new();
+        };
+
+        format!(
             "{}{}{}{}",
             if root.name.is_empty() {
                 ".".to_string()
@@ -104,29 +243,33 @@ impl State {
                 format!("└─ {}", root.name)
             },
             if root.parent_path.is_empty() {
-                "".to_string()
+                String::new()
             } else {
                 format!(".{}", root.parent_path)
             },
             if root.data_keys.is_empty() {
-                "".to_string()
+                String::new()
             } else {
                 format!(
                     "\r\n{}",
                     root.data_keys
                         .iter()
-                        .map(|(key, bytes)| format!(
+                        .map(|(label, data_key)| format!(
                             "{}└─ {}: {} bytes",
                             " ".repeat(nest_level * 4),
-                            key,
-                            bytes.len()
+                            label,
+                            match data_key {
+                                // note will never have an empty vector
+                                DataKey::Note(notes) => notes.last().unwrap().len(),
+                                DataKey::Fact(bytes) => bytes.len(),
+                            }
                         ))
                         .collect::<Vec<String>>()
                         .join("\r\n")
                 )
             },
             if root.child_hashes.is_empty() {
-                "".to_string()
+                String::new()
             } else {
                 format!(
                     "\r\n{}",
@@ -135,236 +278,107 @@ impl State {
                         .map(|hash| format!(
                             "{}{}",
                             " ".repeat(nest_level * 4),
-                            self.tree(hash, nest_level + 1).unwrap()
+                            self.tree(hash, nest_level + 1)
                         ))
                         .collect::<Vec<String>>()
                         .join("\r\n")
                 )
             }
-        ))
-    }
-
-    // for frontend, todo improve
-    pub fn get_node_json(&self, hash: &str) -> anyhow::Result<serde_json::Value> {
-        let node = self
-            .index
-            .get(hash)
-            .ok_or(anyhow::anyhow!("Node not found"))?;
-        Ok(serde_json::to_value(node)?)
+        )
     }
 }
 
-call_init!(init);
-fn init(our: Address) {
-    println!("online");
+app!(
+    "Kimap Explorer",
+    None,
+    None,
+    http_handler,
+    local_request_handler,
+    remote_request_handler
+);
 
-    kinode_process_lib::homepage::add_to_homepage("Kimap Explorer", None, Some("/"), None);
-
-    let mut state = State::new();
-
-    let filter = eth::Filter::new()
-        .address(*state.kimap.address())
-        .from_block(kimap::KIMAP_FIRST_BLOCK)
-        .to_block(eth::BlockNumberOrTag::Latest)
-        .events(vec![
-            kimap::contract::Mint::SIGNATURE,
-            kimap::contract::Note::SIGNATURE,
-            kimap::contract::Fact::SIGNATURE,
-        ]);
-
-    state.kimap.provider.subscribe_loop(1, filter.clone());
-
-    loop {
-        match state.kimap.provider.get_logs(&filter) {
-            Ok(logs) => {
-                for log in logs {
-                    if let Err(e) = handle_log(&our, &mut state, &log) {
-                        // print errors at verbosity=1
-                        println!("log-handling error! {e:?}");
-                    }
-                }
-                break;
-            }
-            Err(e) => {
-                println!("got eth error while fetching logs: {e:?}, trying again in 5s...");
-                std::thread::sleep(std::time::Duration::from_secs(5));
-                continue;
-            }
+fn http_handler(state: &mut State, call: HttpApi) -> (http::server::HttpResponse, Vec<u8>) {
+    match call {
+        HttpApi::GetNode(namehash) => {
+            let Some(node) = state.index.get(&namehash) else {
+                return (
+                    http::server::HttpResponse::new(http::StatusCode::NOT_FOUND),
+                    vec![],
+                );
+            };
+            (
+                http::server::HttpResponse::new(http::StatusCode::OK),
+                serde_json::to_vec(&node).expect("failed to serialize node"),
+            )
         }
-    }
-
-    let mut http_server = http::server::HttpServer::new(5);
-    let http_config = http::server::HttpBindingConfig::default();
-
-    http_server
-        .serve_ui(&our, "ui", vec!["/"], http_config.clone())
-        .unwrap();
-
-    http_server
-        .bind_http_path("/api/tree", http_config.clone())
-        .unwrap();
-    http_server
-        .bind_http_path("/api/node/:hash", http_config.clone())
-        .unwrap();
-    http_server
-        .bind_http_path("/api/info/:hash", http_config)
-        .unwrap();
-
-    loop {
-        match await_message() {
-            Err(e) => {
-                println!("error: {e}");
-            }
-            Ok(message) => {
-                if let Err(e) = handle_message(&our, &mut state, message, &filter) {
-                    println!("error: {e}");
-                }
-            }
+        HttpApi::GetTba(namehash) => {
+            let Ok((tba, owner, data)) = state.kimap.get_hash(&namehash) else {
+                return (
+                    http::server::HttpResponse::new(http::StatusCode::NOT_FOUND),
+                    vec![],
+                );
+            };
+            let info = serde_json::json!({
+                "tba": tba,
+                "owner": owner,
+                "data": data,
+            });
+            (
+                http::server::HttpResponse::new(http::StatusCode::OK),
+                info.to_string().as_bytes().to_vec(),
+            )
         }
     }
 }
 
-fn handle_message(
-    our: &Address,
+fn local_request_handler(
+    _message: &Message,
     state: &mut State,
-    message: Message,
-    filter: &eth::Filter,
-) -> anyhow::Result<()> {
-    let Message::Request { source, body, .. } = message else {
-        return Err(anyhow::anyhow!("unhandled message: {message:?}"));
-    };
-
-    if source.process == "eth:distro:sys" {
-        match handle_eth_message(&our, state, &body) {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                state.kimap.provider.subscribe_loop(1, filter.clone());
-                Err(e)
+    _server: &mut http::server::HttpServer,
+    request: Req,
+) {
+    match request {
+        Req::ExplorerRequest(request) => match request {
+            ExplorerRequest::Tree(name) => {
+                let Some(namehash) = state.names.get(&name) else {
+                    println!("name not found");
+                    return;
+                };
+                println!("{}", state.tree(&namehash, 0));
             }
-        }
-    } else if source.process == "http_server:distro:sys" {
-        if let Ok(http::server::HttpServerRequest::Http(req)) = serde_json::from_slice(&body) {
-            if req.path()? == "/api/tree" {
-                let tree = state.get_node_json(&kimap::KIMAP_ROOT_HASH)?;
-                let headers = HashMap::from([("Content-Type".into(), "application/json".into())]);
-                http::server::send_response(
-                    http::StatusCode::OK,
-                    Some(headers),
-                    tree.to_string().as_bytes().to_vec(),
-                );
-            } else if req.path()?.starts_with("/api/node/") {
-                let hash = req.url_params().get("hash").unwrap();
-                let node = state.get_node_json(&hash)?;
-                let headers = HashMap::from([("Content-Type".into(), "application/json".into())]);
-                http::server::send_response(
-                    http::StatusCode::OK,
-                    Some(headers),
-                    node.to_string().as_bytes().to_vec(),
-                );
-            } else if req.path()?.starts_with("/api/info/") {
-                let hash = req.url_params().get("hash").unwrap();
-                let ret = state.kimap.get_hash(&hash);
+            ExplorerRequest::TreeFromNamehash(namehash) => {
+                println!("{}", state.tree(&namehash, 0));
+            }
+        },
+        Req::Eth(eth_result) => {
+            let Ok(eth::EthSub { result, .. }) = eth_result else {
+                println!("got weird eth result");
+                return;
+            };
 
-                if let Ok((tba, owner, data)) = ret {
-                    let info = serde_json::json!({
-                        "tba": tba,
-                        "owner": owner,
-                        "data": data,
-                    });
+            let Ok(sub_result) = serde_json::from_value::<eth::SubscriptionResult>(result) else {
+                println!("got really weird eth result");
+                return;
+            };
 
-                    let headers =
-                        HashMap::from([("Content-Type".into(), "application/json".into())]);
-
-                    http::server::send_response(
-                        http::StatusCode::OK,
-                        Some(headers),
-                        info.to_string().as_bytes().to_vec(),
-                    );
-                } else {
-                    http::server::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
+            if let eth::SubscriptionResult::Log(log) = sub_result {
+                match state.handle_log(&log) {
+                    Ok(()) => return,
+                    Err(e) => println!("log-handling error! {e:?}"),
                 }
             } else {
-                http::server::send_response(http::StatusCode::NOT_FOUND, None, vec![]);
+                println!("got unhandled eth subscription result: {sub_result:?}");
             }
-        }
-        Ok(())
-    } else {
-        match serde_json::from_slice(&body) {
-            Ok(ExplorerRequest::Tree) => {
-                println!("tree:\r\n{}", state.tree(&kimap::KIMAP_ROOT_HASH, 0)?);
-                Ok(())
-            }
-            Ok(ExplorerRequest::SubTree(root_hash)) => {
-                println!("tree:\r\n{}", state.tree(&root_hash, 0)?);
-                Ok(())
-            }
-            Err(e) => Err(anyhow::anyhow!(
-                "got invalid message from {}: {:?}, {e:?}",
-                source,
-                std::str::from_utf8(&body)
-            )),
         }
     }
 }
 
-fn handle_eth_message(our: &Address, state: &mut State, body: &[u8]) -> anyhow::Result<()> {
-    let Ok(eth_result) = serde_json::from_slice::<eth::EthSubResult>(body) else {
-        return Err(anyhow::anyhow!("got invalid message"));
-    };
-
-    let eth::EthSub { result, .. } =
-        eth_result.map_err(|e| anyhow::anyhow!("got eth subscription error: {e:?}"))?;
-
-    if let eth::SubscriptionResult::Log(log) = result {
-        handle_log(our, state, &log)
-    } else {
-        return Err(anyhow::anyhow!(
-            "got unhandled eth subscription result: {result:?}"
-        ));
-    }
-}
-
-fn handle_log(_our: &Address, state: &mut State, log: &eth::Log) -> anyhow::Result<()> {
-    match log.topics()[0] {
-        kimap::contract::Mint::SIGNATURE_HASH => {
-            let decoded = kimap::contract::Mint::decode_log_data(log.data(), true).unwrap();
-
-            let parent_hash = decoded.parenthash.to_string();
-            let child_hash = decoded.childhash.to_string();
-            let label = String::from_utf8(decoded.label.to_vec())?;
-
-            // println!("got mint: {label}, parent_hash: {parent_hash}, child_hash: {child_hash}");
-            match state.add_mint(&parent_hash, child_hash, label) {
-                Ok(()) => (), // println!("added entry to index"),
-                Err(e) => println!("ERROR: {e}"),
-            }
-        }
-        kimap::contract::Note::SIGNATURE_HASH => {
-            let decoded = kimap::contract::Note::decode_log_data(log.data(), true).unwrap();
-
-            let parent_hash = decoded.parenthash.to_string();
-            let note_label = String::from_utf8(decoded.label.to_vec())?;
-
-            // println!("got note: {note_label}, node_hash: {parent_hash}",);
-            match state.add_note(&parent_hash, note_label, decoded.data) {
-                Ok(()) => (), // println!("added note to index"),
-                Err(e) => println!("ERROR: {e}"),
-            }
-        }
-        kimap::contract::Fact::SIGNATURE_HASH => {
-            let decoded = kimap::contract::Fact::decode_log_data(log.data(), true).unwrap();
-
-            let parent_hash = decoded.parenthash.to_string();
-            let fact_label = String::from_utf8(decoded.label.to_vec())?;
-
-            // println!("got fact: {fact_label}, node_hash: {parent_hash}",);
-            match state.add_note(&parent_hash, fact_label, decoded.data) {
-                Ok(()) => (), // println!("added fact to index"),
-                Err(e) => println!("ERROR: {e}"),
-            }
-        }
-        _ => {}
-    }
-
-    Ok(())
+/// won't get these since manifest declares networking false.
+fn remote_request_handler(
+    _message: &Message,
+    _state: &mut State,
+    _server: &mut http::server::HttpServer,
+    _request: Req,
+) {
+    return;
 }

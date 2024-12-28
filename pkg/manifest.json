@@ -6,12 +6,12 @@
         "request_networking": false,
         "request_capabilities": [
             "homepage:homepage:sys",
-            "http_server:distro:sys",
+            "http-server:distro:sys",
             "eth:distro:sys",
             "vfs:distro:sys"
         ],
         "grant_capabilities": [
-            "http_server:distro:sys",
+            "http-server:distro:sys",
             "eth:distro:sys",
             "terminal:terminal:sys"
         ],

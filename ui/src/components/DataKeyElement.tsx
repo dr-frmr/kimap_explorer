@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 
-interface DataKeyElementProps {
-    dataKey: string;
-    dataValue: string;
+export interface DataKey {
+    Note?: string[],
+    Fact?: string
 }
 
-const DataKeyElement: React.FC<DataKeyElementProps> = ({ dataKey, dataValue }) => {
+interface DataKeyElementProps {
+    dataKey: string;
+    dataValue: DataKey;
+}
+
+export const DataKeyElement: React.FC<DataKeyElementProps> = ({ dataKey, dataValue }) => {
     const [valueVisible, setValueVisible] = useState(false);
 
     const toggleValue = () => setValueVisible(!valueVisible);
@@ -32,7 +37,17 @@ const DataKeyElement: React.FC<DataKeyElementProps> = ({ dataKey, dataValue }) =
             <button className="info-button" onClick={toggleValue}>📄</button>
             {valueVisible && (
                 <div className="info-container">
-                    {tryParseUtf8(dataValue)}
+                    {dataValue.Note && (
+                        <div className="note-history">
+                            <div className="note-history-label">Note History (newest to oldest):</div>
+                            {[...dataValue.Note].reverse().map((note, index) => (
+                                <div key={index} className="note-revision">
+                                    <span className="revision-number">{dataValue.Note!.length - index}:</span> {tryParseUtf8(note)}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {dataValue.Fact && <div>{tryParseUtf8(dataValue.Fact)}</div>}
                 </div>
             )}
         </div>

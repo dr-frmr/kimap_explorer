@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TreeContainer from './TreeContainer';
+import { fetchNode } from '../helpers';
 
 const KimapExplorer: React.FC = () => {
     const [rootNode, setRootNode] = useState(null);
@@ -10,8 +11,7 @@ const KimapExplorer: React.FC = () => {
 
     const fetchRootNode = async () => {
         try {
-            const response = await fetch('/explorer:kimap-explorer:doria.kino/api/node/0x0000000000000000000000000000000000000000000000000000000000000000');
-            const data = await response.json();
+            const data = await fetchNode('0x0000000000000000000000000000000000000000000000000000000000000000');
             setRootNode(data);
         } catch (error) {
             console.error('Error fetching root node:', error);

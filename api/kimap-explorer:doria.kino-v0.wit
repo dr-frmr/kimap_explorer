@@ -1,7 +1,18 @@
 interface kimap-explorer {
+    type namehash = string;
+    type name = string;
+
+    variant request {
+        /// prints a tree from the given name in terminal
+        /// blob: none
+        tree(name),
+        /// prints a tree from the given namehash in terminal
+        /// blob: none
+        tree-from-namehash(namehash),
+    }
 }
 
-world kimap-explorer-doria-dot-kino-v0 {
+world kimap-explorer-doria-dot-kino-v1 {
     import kimap-explorer;
-    include process-v0;
+    include process-v1;
 }

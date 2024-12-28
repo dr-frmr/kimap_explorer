@@ -4,8 +4,8 @@ import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useAddRecentTransaction } from '@rainbow-me/rainbowkit';
 
 
-import { fetchNodeInfo, mintFunction, noteFunction } from '../abis/helpers';
-import { KINOMAP, mechAbi } from '../abis';
+import { fetchNodeInfo, mintFunction, noteFunction } from '../helpers';
+import { KIMAP, mechAbi } from '../abis';
 
 interface InfoContainerProps {
     hash: string;
@@ -81,7 +81,7 @@ const InfoContainer: React.FC<InfoContainerProps> = ({ hash, refetchNode }) => {
             abi: mechAbi,
             functionName: 'execute',
             args: [
-                KINOMAP,
+                KIMAP,
                 BigInt(0),
                 data,
                 0,
@@ -103,7 +103,7 @@ const InfoContainer: React.FC<InfoContainerProps> = ({ hash, refetchNode }) => {
             abi: mechAbi,
             functionName: 'execute',
             args: [
-                KINOMAP,
+                KIMAP,
                 BigInt(0),
                 data,
                 0,

@@ -4,15 +4,16 @@
     "image": "",
     "properties": {
         "package_name": "kimap-explorer",
-        "current_version": "0.1.0",
+        "current_version": "0.2.0",
         "publisher": "doria.kino",
         "mirrors": [
             "doria.kino"
         ],
         "code_hashes": {
-            "0.1.0": "d9284fd116811aa7f07a611014ef2e64737fc7c50d61a0454723ea8a4548bb56"
+            "0.1.0": "d9284fd116811aa7f07a611014ef2e64737fc7c50d61a0454723ea8a4548bb56",
+            "0.2.0": ""
         },
-        "wit_version": 0,
+        "wit_version": 1,
         "dependencies": []
     },
     "external_url": "",

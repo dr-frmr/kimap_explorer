@@ -1,14 +1,25 @@
 import { encodeFunctionData, encodePacked, stringToHex } from "viem";
-import { kinomapAbi, KINO_ACCOUNT_IMPL } from "./";
+import { kinomapAbi, KINO_ACCOUNT_IMPL, API_PATH } from "./abis";
 
 // GETs to kinode app
+
 export async function fetchNode(hash: string) {
-    const response = await fetch(`/explorer:kimap-explorer:doria.kino/api/node/${hash}`);
+    const response = await fetch(API_PATH, {
+        method: 'POST',
+        body: JSON.stringify({
+            GetNode: hash
+        })
+    });
     return await response.json();
 }
 
 export async function fetchNodeInfo(hash: string) {
-    const response = await fetch(`/explorer:kimap-explorer:doria.kino/api/info/${hash}`);
+    const response = await fetch(API_PATH, {
+        method: 'POST',
+        body: JSON.stringify({
+            GetTba: hash
+        })
+    });
     return await response.json();
 }
 
