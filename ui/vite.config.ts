@@ -33,5 +33,15 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        inlineDynamicImports: true,  // Inline dynamic imports
+        manualChunks: undefined,     // Disable code splitting
+        format: 'iife',              // Use IIFE format
+        entryFileNames: 'bundle.js', // Name the output file
+      },
+    },
+  },
 
 })

@@ -362,7 +362,6 @@ fn local_request_handler(
         },
         Req::Eth(eth_result) => {
             let Ok(eth::EthSub { result, .. }) = eth_result else {
-                println!("got weird eth result");
                 return;
             };
 
