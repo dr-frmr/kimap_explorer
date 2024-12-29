@@ -2,7 +2,7 @@ use alloy_sol_types::SolEvent;
 use kinode::process::kimap_explorer::{Name, Namehash, Request as ExplorerRequest};
 use kinode_app_framework::{app, eth, http, kimap, println, Address, Message};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 wit_bindgen::generate!({
     path: "target/wit",
@@ -21,9 +21,9 @@ enum Req {
 #[derive(Debug, Deserialize, Serialize)]
 enum HttpApi {
     /// fetch node info indexed within this app
-    GetNode(Namehash),
+    GetNode(Name),
     /// fetch onchain tba and owner for a node
-    GetTba(Namehash),
+    GetTba(Name),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -42,8 +42,8 @@ struct Node {
     pub parent_path: String,
     /// the name of the node -- a string.
     pub name: Name,
-    /// the child namehashes of the node
-    pub child_hashes: BTreeSet<Namehash>,
+    /// the children of the node
+    pub child_names: BTreeSet<Name>,
     /// the node's data keys
     pub data_keys: BTreeMap<String, DataKey>,
 }
@@ -52,7 +52,7 @@ struct Node {
 struct State {
     pub kimap: kimap::Kimap,
     /// lookup table from name to namehash
-    pub names: BTreeMap<Name, Namehash>,
+    pub names: HashMap<Name, Namehash>,
     /// map from a namehash to its information
     pub index: BTreeMap<String, Node>,
 }
@@ -68,13 +68,13 @@ impl kinode_app_framework::State for State {
 
         let mut new_state = Self {
             kimap: kimap.clone(),
-            names: BTreeMap::new(),
+            names: HashMap::from([(String::new(), kimap::KIMAP_ROOT_HASH.to_string())]),
             index: BTreeMap::from([(
                 kimap::KIMAP_ROOT_HASH.to_string(),
                 Node {
                     parent_path: String::new(),
                     name: String::new(),
-                    child_hashes: BTreeSet::new(),
+                    child_names: BTreeSet::new(),
                     data_keys: BTreeMap::new(),
                 },
             )]),
@@ -159,24 +159,24 @@ impl State {
             .get_mut(parent_hash)
             .ok_or(anyhow::anyhow!("parent for child {child_hash} not found!"))?;
 
-        parent_node.child_hashes.insert(child_hash.clone());
-
         let parent_path: String = if parent_hash == kimap::KIMAP_ROOT_HASH {
             String::new()
         } else if parent_node.parent_path.is_empty() {
             format!(".{}", parent_node.name)
         } else {
-            format!(".{}.{}", parent_node.name, parent_node.parent_path)
+            format!(".{}{}", parent_node.name, parent_node.parent_path)
         };
 
-        self.names
-            .insert(format!("{}{}", name, parent_path), child_hash.clone());
+        let full_name = format!("{}{}", name, parent_path);
+
+        parent_node.child_names.insert(full_name.clone());
+        self.names.insert(full_name, child_hash.clone());
         self.index.insert(
             child_hash,
             Node {
                 parent_path,
                 name,
-                child_hashes: BTreeSet::new(),
+                child_names: BTreeSet::new(),
                 data_keys: BTreeMap::new(),
             },
         );
@@ -245,7 +245,7 @@ impl State {
             if root.parent_path.is_empty() {
                 String::new()
             } else {
-                format!(".{}", root.parent_path)
+                root.parent_path.to_string()
             },
             if root.data_keys.is_empty() {
                 String::new()
@@ -268,18 +268,22 @@ impl State {
                         .join("\r\n")
                 )
             },
-            if root.child_hashes.is_empty() {
+            if root.child_names.is_empty() {
                 String::new()
             } else {
                 format!(
                     "\r\n{}",
-                    root.child_hashes
+                    root.child_names
                         .iter()
-                        .map(|hash| format!(
-                            "{}{}",
-                            " ".repeat(nest_level * 4),
-                            self.tree(hash, nest_level + 1)
-                        ))
+                        .map(|name| if let Some(namehash) = self.names.get(name) {
+                            format!(
+                                "{}{}",
+                                " ".repeat(nest_level * 4),
+                                self.tree(namehash, nest_level + 1)
+                            )
+                        } else {
+                            String::new()
+                        })
                         .collect::<Vec<String>>()
                         .join("\r\n")
                 )
@@ -299,11 +303,17 @@ app!(
 
 fn http_handler(state: &mut State, call: HttpApi) -> (http::server::HttpResponse, Vec<u8>) {
     match call {
-        HttpApi::GetNode(namehash) => {
-            let Some(node) = state.index.get(&namehash) else {
+        HttpApi::GetNode(name) => {
+            let Some(namehash) = state.names.get(&name) else {
                 return (
                     http::server::HttpResponse::new(http::StatusCode::NOT_FOUND),
-                    vec![],
+                    "name not found".as_bytes().to_vec(),
+                );
+            };
+            let Some(node) = state.index.get(namehash) else {
+                return (
+                    http::server::HttpResponse::new(http::StatusCode::NOT_FOUND),
+                    "namehash not found".as_bytes().to_vec(),
                 );
             };
             (
@@ -311,8 +321,8 @@ fn http_handler(state: &mut State, call: HttpApi) -> (http::server::HttpResponse
                 serde_json::to_vec(&node).expect("failed to serialize node"),
             )
         }
-        HttpApi::GetTba(namehash) => {
-            let Ok((tba, owner, data)) = state.kimap.get_hash(&namehash) else {
+        HttpApi::GetTba(name) => {
+            let Ok((tba, owner, data)) = state.kimap.get(&name) else {
                 return (
                     http::server::HttpResponse::new(http::StatusCode::NOT_FOUND),
                     vec![],
@@ -344,10 +354,10 @@ fn local_request_handler(
                     println!("name not found");
                     return;
                 };
-                println!("{}", state.tree(&namehash, 0));
+                println!("\r\n{}", state.tree(&namehash, 0));
             }
             ExplorerRequest::TreeFromNamehash(namehash) => {
-                println!("{}", state.tree(&namehash, 0));
+                println!("\r\n{}", state.tree(&namehash, 0));
             }
         },
         Req::Eth(eth_result) => {

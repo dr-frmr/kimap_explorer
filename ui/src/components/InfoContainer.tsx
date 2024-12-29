@@ -8,7 +8,7 @@ import { fetchNodeInfo, mintFunction, noteFunction } from '../helpers';
 import { KIMAP, mechAbi } from '../abis';
 
 interface InfoContainerProps {
-    hash: string;
+    name: string;
     refetchNode: () => void;
 }
 
@@ -18,7 +18,7 @@ interface Info {
     data_hex: string;
 }
 
-const InfoContainer: React.FC<InfoContainerProps> = ({ hash, refetchNode }) => {
+const InfoContainer: React.FC<InfoContainerProps> = ({ name, refetchNode }) => {
     const [info, setInfo] = useState<Info | null>(null);
     const [key, setKey] = useState('');
     const [value, setValue] = useState('');
@@ -59,11 +59,11 @@ const InfoContainer: React.FC<InfoContainerProps> = ({ hash, refetchNode }) => {
 
     useEffect(() => {
         fetchInfo();
-    }, [hash]);
+    }, [name]);
 
     const fetchInfo = async () => {
         try {
-            const data = await fetchNodeInfo(hash);
+            const data = await fetchNodeInfo(name);
             setInfo(data);
         } catch (error) {
             console.error('Error fetching node info:', error);

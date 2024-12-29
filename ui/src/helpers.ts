@@ -3,21 +3,21 @@ import { kinomapAbi, KINO_ACCOUNT_IMPL, API_PATH } from "./abis";
 
 // GETs to kinode app
 
-export async function fetchNode(hash: string) {
+export async function fetchNode(name: string) {
     const response = await fetch(API_PATH, {
         method: 'POST',
         body: JSON.stringify({
-            GetNode: hash
+            GetNode: name
         })
     });
     return await response.json();
 }
 
-export async function fetchNodeInfo(hash: string) {
+export async function fetchNodeInfo(name: string) {
     const response = await fetch(API_PATH, {
         method: 'POST',
         body: JSON.stringify({
-            GetTba: hash
+            GetTba: name
         })
     });
     return await response.json();

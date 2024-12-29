@@ -8,8 +8,8 @@ interface TreeContainerProps {
 const TreeContainer: React.FC<TreeContainerProps> = ({ node }) => {
     return (
         <div className="tree-container">
-            {node.child_hashes.map((hash: string) => (
-                <NodeElement key={hash} hash={hash} />
+            {node.child_names.map((name: string) => (
+                <NodeElement key={name} name={name} />
             ))}
         </div>
     );
