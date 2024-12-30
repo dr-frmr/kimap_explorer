@@ -49,3 +49,14 @@ export function noteFunction(key: string, value: string) {
         ]
     });
 }
+
+export function factFunction(key: string, value: string) {
+    return encodeFunctionData({
+        abi: kinomapAbi,
+        functionName: 'fact',
+        args: [
+            encodePacked(["bytes"], [stringToHex(key)]),
+            encodePacked(["bytes"], [stringToHex(value)]),
+        ]
+    });
+}
