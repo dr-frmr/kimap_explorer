@@ -25,7 +25,7 @@ export async function fetchNodeInfo(name: string) {
 
 
 // chain interaction encoding functions
-export function mintFunction(our_address: `0x${string}`, nodename: string) {
+export function mintFunction(our_address: `0x${string}`, nodename: string, implementation?: `0x${string}`) {
     return encodeFunctionData({
         abi: kinomapAbi,
         functionName: 'mint',
@@ -34,7 +34,7 @@ export function mintFunction(our_address: `0x${string}`, nodename: string) {
             encodePacked(["bytes"], [stringToHex(nodename)]),
             "0x", // empty initial calldata
             "0x", // empty erc721 details
-            KINO_ACCOUNT_IMPL,
+            implementation ?? KINO_ACCOUNT_IMPL,
         ]
     })
 }
