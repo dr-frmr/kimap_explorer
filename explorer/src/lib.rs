@@ -1,6 +1,6 @@
 use alloy_sol_types::SolEvent;
 use kinode::process::kimap_explorer::{Name, Namehash, Request as ExplorerRequest};
-use kinode_app_framework::{app, eth, http, kimap, println, Address, Message};
+use kinode_app_framework::{app, eth, http, kimap, println, req, Address, Message};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -11,12 +11,16 @@ wit_bindgen::generate!({
     additional_derives: [serde::Deserialize, serde::Serialize, kinode_app_framework::SerdeJsonInto],
 });
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-enum Req {
-    ExplorerRequest(ExplorerRequest),
-    Eth(eth::EthSubResult),
-}
+req!((Explorer, ExplorerRequest), (Eth, eth::EthSubResult));
+
+app!(
+    "Kimap Explorer",
+    None,
+    None,
+    http_handler,
+    local_request_handler,
+    remote_request_handler
+);
 
 #[derive(Debug, Deserialize, Serialize)]
 enum HttpApi {
@@ -292,15 +296,6 @@ impl State {
     }
 }
 
-app!(
-    "Kimap Explorer",
-    None,
-    None,
-    http_handler,
-    local_request_handler,
-    remote_request_handler
-);
-
 fn http_handler(state: &mut State, call: HttpApi) -> (http::server::HttpResponse, Vec<u8>) {
     match call {
         HttpApi::GetNode(name) => {
@@ -348,7 +343,7 @@ fn local_request_handler(
     request: Req,
 ) {
     match request {
-        Req::ExplorerRequest(request) => match request {
+        Req::Explorer(request) => match request {
             ExplorerRequest::Tree(name) => {
                 let Some(namehash) = state.names.get(&name) else {
                     println!("name not found");

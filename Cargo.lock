@@ -1615,7 +1615,7 @@ dependencies = [
 [[package]]
 name = "kinode-app-framework"
 version = "0.1.0"
-source = "git+https://github.com/kinode-dao/app-framework.git?rev=de5517e#de5517ec3956a11af59bdfc4b0a433e64cfb35ca"
+source = "git+https://github.com/kinode-dao/app-framework.git?rev=32b0fad#32b0fad55c49efbf901d78167b9a2581d7e8b60f"
 dependencies = [
  "anyhow",
  "kinode_process_lib",
