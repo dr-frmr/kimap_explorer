@@ -4,7 +4,7 @@
     "image": "",
     "properties": {
         "package_name": "kimap-explorer",
-        "current_version": "0.3.0",
+        "current_version": "1.0.0",
         "publisher": "doria.kino",
         "mirrors": [
             "doria.kino"
@@ -12,7 +12,8 @@
         "code_hashes": {
             "0.1.0": "d9284fd116811aa7f07a611014ef2e64737fc7c50d61a0454723ea8a4548bb56",
             "0.2.0": "843750a6d560ffdc1fdfe691c3e6c844a3cbef1a5e58900b1824637fa7f573ac",
-            "0.3.0": "2423bd3e80c0fbc8f691de50e9d82c897096ad751cc6c80051d49df4ba137c69"
+            "0.3.0": "2423bd3e80c0fbc8f691de50e9d82c897096ad751cc6c80051d49df4ba137c69",
+            "1.0.0": ""
         },
         "wit_version": 1,
         "dependencies": []
