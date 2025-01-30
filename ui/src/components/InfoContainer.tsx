@@ -3,7 +3,6 @@ import { useAccount, useWriteContract } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { useAddRecentTransaction } from '@rainbow-me/rainbowkit';
 
-
 import { fetchNodeInfo, mintFunction, noteFunction, factFunction } from '../helpers';
 import { KIMAP, mechAbi } from '../abis';
 
@@ -25,6 +24,7 @@ const InfoContainer: React.FC<InfoContainerProps> = ({ name, refetchNode }) => {
     const [factKey, setFactKey] = useState('!');
     const [factValue, setFactValue] = useState('');
     const [subname, setSubname] = useState('');
+    const [implementation, setImplementation] = useState<string>('');
 
     const { address } = useAccount();
     const { openConnectModal } = useConnectModal();
@@ -80,7 +80,6 @@ const InfoContainer: React.FC<InfoContainerProps> = ({ name, refetchNode }) => {
             },
         },
     });
-
 
     useEffect(() => {
         fetchInfo();
@@ -143,7 +142,11 @@ const InfoContainer: React.FC<InfoContainerProps> = ({ name, refetchNode }) => {
             return;
         }
         if (!info) return;
-        const data = mintFunction(address, subname);
+        const data = mintFunction(
+            address, 
+            subname, 
+            implementation ? implementation as `0x${string}` : undefined
+        );
         mint({
             address: info.tba as `0x${string}`,
             abi: mechAbi,
@@ -216,13 +219,20 @@ const InfoContainer: React.FC<InfoContainerProps> = ({ name, refetchNode }) => {
                         </button>
                     </div>
                     <div className="note-input-subcontainer">
-                        <input type="text" placeholder="New Subname" value={subname} onChange={(e) => setSubname(e.target.value)} className="note-input" />
-                        <button
-                            onClick={handleMint}
-                            className={`add-note-button ${mintPending ? 'loading' : ''}`}
-                            disabled={mintPending}
-                        >
-                            Mint
+                        <input
+                            type="text"
+                            value={subname}
+                            onChange={(e) => setSubname(e.target.value)}
+                            placeholder="Enter subname"
+                        />
+                        <input
+                            type="text"
+                            value={implementation}
+                            onChange={(e) => setImplementation(e.target.value)}
+                            placeholder="Implementation (optional)"
+                        />
+                        <button onClick={handleMint} disabled={mintPending}>
+                            Mint Subname
                         </button>
                     </div>
                 </div>
