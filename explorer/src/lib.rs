@@ -1,6 +1,6 @@
 use alloy_sol_types::SolEvent;
 use kinode::process::kimap_explorer::{Name, Namehash, Request as ExplorerRequest};
-use kinode_app_framework::{app, eth, http, kimap, println, req, Address, Message};
+use kinode_app_framework::{app, eth, http, kimap, println, req, Message};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
